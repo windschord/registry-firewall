@@ -1,0 +1,73 @@
+[package]
+name = "registry-firewall"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+description = "A unified registry proxy that protects development environments from software supply chain attacks"
+license = "Apache-2.0"
+repository = "https://github.com/windschord/registry-firewall"
+
+[dependencies]
+# Async runtime
+tokio = { version = "1", features = ["full", "process"] }
+
+# Web framework
+axum = { version = "0.7", features = ["macros"] }
+tower = "0.4"
+tower-http = { version = "0.5", features = ["cors", "trace", "compression-gzip"] }
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_yaml = "0.9"
+
+# Database
+rusqlite = { version = "0.31", features = ["bundled"] }
+tokio-rusqlite = "0.5"
+
+# HTTP client
+reqwest = { version = "0.12", features = ["json", "gzip"] }
+
+# OpenTelemetry
+opentelemetry = "0.22"
+opentelemetry-otlp = "0.15"
+opentelemetry_sdk = { version = "0.22", features = ["rt-tokio"] }
+tracing = "0.1"
+tracing-opentelemetry = "0.23"
+tracing-subscriber = { version = "0.3", features = ["json", "env-filter"] }
+
+# Security
+argon2 = "0.5"
+rand = "0.8"
+base64 = "0.22"
+
+# Version parsing
+semver = "1"
+
+# Utilities
+chrono = { version = "0.4", features = ["serde"] }
+bytes = "1"
+async-trait = "0.1"
+thiserror = "1"
+anyhow = "1"
+config = "0.14"
+
+# Embed static files
+rust-embed = "8"
+
+# Git operations (for OpenSSF sync)
+git2 = "0.18"
+
+# Archive handling
+zip = "0.6"
+flate2 = "1"
+
+# Concurrency control
+tokio-util = "0.7"
+
+[dev-dependencies]
+mockall = "0.12"
+axum-test = "14"
+tempfile = "3"
+tokio-test = "0.4"
+wiremock = "0.6"

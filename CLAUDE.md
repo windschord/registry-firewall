@@ -1,107 +1,107 @@
-# CLAUDE.md - AI Assistant Guide for registry-firewall
+# CLAUDE.md - AIアシスタント向けガイド
 
-## Project Overview
+## プロジェクト概要
 
-**registry-firewall** is an integrated registry proxy designed to protect development environments from software supply chain attacks. It integrates with external security data sources like OSV and OpenSSF Malicious Packages to filter malicious packages and versions. The plugin architecture allows flexible extension for supported languages and security sources.
+**registry-firewall**は、ソフトウェアサプライチェーン攻撃から開発環境を保護するための統合レジストリプロキシです。OSVやOpenSSF Malicious Packagesなどの外部セキュリティデータソースと連携し、悪意あるパッケージやバージョンをフィルタリングします。プラグインアーキテクチャにより、対応言語やセキュリティソースを柔軟に拡張できます。
 
-### Key Goals
-- Automatic blocking of malicious packages
-- Unified protection across multiple language ecosystems (PyPI, Go, Cargo, Docker)
-- Low operational cost with continuous security assurance
-- OpenTelemetry-based standard observability
-- Intuitive management via Web UI
+### 主な目標
+- 悪意あるパッケージの自動ブロック
+- 複数言語エコシステムの統一的な保護（PyPI、Go、Cargo、Docker）
+- 低運用コストでの継続的なセキュリティ確保
+- OpenTelemetryによる標準的な可観測性の提供
+- Web UIによる直感的な管理インターフェース
 
-### Tech Stack
-- **Language**: Rust 1.75+ (edition 2021)
-- **Async Runtime**: tokio
-- **HTTP Framework**: axum
-- **Database**: SQLite (rusqlite)
-- **Observability**: OpenTelemetry
-- **Frontend**: React + TypeScript + Tailwind CSS (embedded via rust-embed)
+### 技術スタック
+- **言語**: Rust 1.75+（edition 2021）
+- **非同期ランタイム**: tokio
+- **HTTPフレームワーク**: axum
+- **データベース**: SQLite（rusqlite）
+- **可観測性**: OpenTelemetry
+- **フロントエンド**: React + TypeScript + Tailwind CSS（rust-embedで埋め込み）
 
-## Repository Structure
+## リポジトリ構成
 
 ```
 registry-firewall/
-├── CLAUDE.md              # This file - AI assistant guide
-├── Cargo.toml             # Rust dependencies and project config
-├── Cargo.lock             # Locked dependency versions
-├── LICENSE                # Apache 2.0 License
-├── .gitignore             # Git ignore patterns
+├── CLAUDE.md              # 本ファイル - AIアシスタント向けガイド
+├── Cargo.toml             # Rust依存関係とプロジェクト設定
+├── Cargo.lock             # 依存関係のロックファイル
+├── LICENSE                # Apache 2.0ライセンス
+├── .gitignore             # Git除外パターン
 ├── docs/
-│   ├── requirements.md    # Detailed requirements (Japanese)
-│   ├── design.md          # Technical design document (Japanese)
-│   └── tasks.md           # Implementation task list (Japanese)
+│   ├── requirements.md    # 詳細な要件定義書
+│   ├── design.md          # 技術設計書
+│   └── tasks.md           # 実装タスク一覧
 ├── src/
-│   ├── main.rs            # Application entry point
-│   ├── lib.rs             # Library root
-│   ├── error.rs           # Common error types (AppError)
-│   ├── config/            # Configuration management
+│   ├── main.rs            # アプリケーションエントリーポイント
+│   ├── lib.rs             # ライブラリルート
+│   ├── error.rs           # 共通エラー型（AppError）
+│   ├── config/            # 設定管理
 │   │   ├── mod.rs
 │   │   └── validation.rs
-│   ├── server/            # HTTP server components
+│   ├── server/            # HTTPサーバーコンポーネント
 │   │   ├── mod.rs
-│   │   ├── router.rs      # axum router setup
-│   │   └── middleware.rs  # Auth, logging, tracing middleware
-│   ├── auth/              # Authentication system
+│   │   ├── router.rs      # axumルーター設定
+│   │   └── middleware.rs  # 認証・ロギング・トレーシングミドルウェア
+│   ├── auth/              # 認証システム
 │   │   ├── mod.rs
-│   │   ├── manager.rs     # AuthManager implementation
-│   │   ├── token.rs       # Token generation/validation
-│   │   └── ratelimit.rs   # Rate limiting for auth failures
-│   ├── sync/              # Data synchronization infrastructure
+│   │   ├── manager.rs     # AuthManager実装
+│   │   ├── token.rs       # トークン生成・検証
+│   │   └── ratelimit.rs   # 認証失敗時のレートリミット
+│   ├── sync/              # データ同期インフラストラクチャ
 │   │   ├── mod.rs
-│   │   ├── scheduler.rs   # Auto-sync scheduler with jitter
-│   │   ├── retry.rs       # Exponential backoff retry manager
-│   │   └── http_client.rs # Rate-limited HTTP client
-│   ├── plugins/           # Plugin system
+│   │   ├── scheduler.rs   # ジッター付き自動同期スケジューラー
+│   │   ├── retry.rs       # 指数バックオフリトライマネージャー
+│   │   └── http_client.rs # レートリミット付きHTTPクライアント
+│   ├── plugins/           # プラグインシステム
 │   │   ├── mod.rs
-│   │   ├── registry/      # Registry plugins (PyPI, Go, Cargo, Docker)
+│   │   ├── registry/      # レジストリプラグイン（PyPI、Go、Cargo、Docker）
 │   │   │   ├── mod.rs
-│   │   │   ├── traits.rs  # RegistryPlugin trait
+│   │   │   ├── traits.rs  # RegistryPluginトレイト
 │   │   │   ├── pypi.rs
 │   │   │   ├── golang.rs
 │   │   │   ├── cargo.rs
 │   │   │   └── docker.rs
-│   │   ├── security/      # Security source plugins
+│   │   ├── security/      # セキュリティソースプラグイン
 │   │   │   ├── mod.rs
-│   │   │   ├── traits.rs  # SecuritySourcePlugin trait
-│   │   │   ├── osv.rs     # OSV database integration
+│   │   │   ├── traits.rs  # SecuritySourcePluginトレイト
+│   │   │   ├── osv.rs     # OSVデータベース連携
 │   │   │   ├── openssf.rs # OpenSSF Malicious Packages
-│   │   │   ├── custom.rs  # Custom blocklist
-│   │   │   └── minage.rs  # Minimum age filter
-│   │   └── cache/         # Cache plugins
+│   │   │   ├── custom.rs  # カスタムブロックリスト
+│   │   │   └── minage.rs  # 最小経過時間フィルタ
+│   │   └── cache/         # キャッシュプラグイン
 │   │       ├── mod.rs
-│   │       ├── traits.rs  # CachePlugin trait
+│   │       ├── traits.rs  # CachePluginトレイト
 │   │       ├── filesystem.rs
 │   │       └── redis.rs
-│   ├── database/          # Database layer
+│   ├── database/          # データベース層
 │   │   ├── mod.rs
-│   │   ├── sqlite.rs      # SQLite implementation
-│   │   └── migrations.rs  # Schema migrations
-│   ├── otel/              # OpenTelemetry integration
+│   │   ├── sqlite.rs      # SQLite実装
+│   │   └── migrations.rs  # スキーママイグレーション
+│   ├── otel/              # OpenTelemetry統合
 │   │   └── mod.rs
-│   ├── webui/             # Web UI backend
+│   ├── webui/             # Web UIバックエンド
 │   │   ├── mod.rs
-│   │   └── api.rs         # REST API endpoints
-│   └── models/            # Domain models
+│   │   └── api.rs         # REST APIエンドポイント
+│   └── models/            # ドメインモデル
 │       ├── mod.rs
 │       ├── package.rs
 │       ├── block.rs
 │       └── token.rs
-├── tests/                 # Integration tests
+├── tests/                 # 統合テスト
 │   ├── common/mod.rs
 │   ├── integration_pypi.rs
 │   ├── integration_auth.rs
 │   ├── integration_cache.rs
 │   └── integration_sync.rs
-├── web/                   # React frontend (to be created)
+├── web/                   # Reactフロントエンド（作成予定）
 │   ├── src/
 │   ├── package.json
 │   └── vite.config.ts
-├── configs/               # Configuration files
+├── configs/               # 設定ファイル
 │   ├── config.yaml
 │   └── custom-blocklist.yaml
-└── deployments/           # Deployment configurations
+└── deployments/           # デプロイ設定
     ├── docker/
     │   └── Dockerfile
     └── docker-compose/
@@ -109,80 +109,80 @@ registry-firewall/
         └── otel-collector-config.yaml
 ```
 
-## Development Workflow
+## 開発ワークフロー
 
-### Test-Driven Development (TDD)
+### テスト駆動開発（TDD）
 
-This project strictly follows TDD. **All implementation must follow the Red-Green-Refactor cycle:**
+本プロジェクトはTDDを厳守します。**すべての実装はRed-Green-Refactorサイクルに従ってください：**
 
-1. **Red**: Write a failing test first
-2. **Green**: Write minimal implementation to pass the test
-3. **Refactor**: Improve code quality while keeping tests green
+1. **Red**: まず失敗するテストを書く
+2. **Green**: テストを通す最小限の実装を書く
+3. **Refactor**: テストを通したまま、コード品質を改善する
 
-### Test Coverage Goals
-- Domain logic: 90%+
-- Infrastructure: 70%+
-- Overall: 80%+
+### テストカバレッジ目標
+- ドメインロジック: 90%以上
+- インフラストラクチャ: 70%以上
+- 全体: 80%以上
 
-### Running Tests
+### テスト実行
 
 ```bash
-# Run all tests
+# 全テスト実行
 cargo test
 
-# Run specific module tests
-cargo test error           # Error handling tests
-cargo test config          # Configuration tests
-cargo test database        # Database tests
-cargo test retry           # Retry manager tests
-cargo test scheduler       # Sync scheduler tests
-cargo test osv             # OSV plugin tests
-cargo test pypi            # PyPI plugin tests
+# 特定モジュールのテスト実行
+cargo test error           # エラーハンドリングテスト
+cargo test config          # 設定テスト
+cargo test database        # データベーステスト
+cargo test retry           # リトライマネージャーテスト
+cargo test scheduler       # 同期スケジューラーテスト
+cargo test osv             # OSVプラグインテスト
+cargo test pypi            # PyPIプラグインテスト
 
-# Run integration tests
+# 統合テスト実行
 cargo test --test '*'
 
-# Run with output
+# 出力付きで実行
 cargo test -- --nocapture
 ```
 
-### Code Quality
+### コード品質
 
 ```bash
-# Format code
+# コードフォーマット
 cargo fmt
 
-# Run linter
+# リンター実行
 cargo clippy
 
-# Check without building
+# ビルドせずにチェック
 cargo check
 
-# Build release
+# リリースビルド
 cargo build --release
 ```
 
-## Key Conventions
+## 主要な規約
 
-### Error Handling
+### エラーハンドリング
 
-Use `thiserror` for defining errors:
+`thiserror`を使用してエラーを定義：
 
 ```rust
 #[derive(Debug, thiserror::Error)]
 pub enum AppError {
-    #[error("Authentication failed: {0}")]
+    #[error("認証に失敗しました: {0}")]
     Auth(#[from] AuthError),
 
-    #[error("Plugin error: {0}")]
+    #[error("プラグインエラー: {0}")]
     Plugin(#[from] PluginError),
     // ...
 }
 ```
 
-### Async Traits
+### 非同期トレイト
 
-Use `async_trait` for async trait methods:
+非同期トレイトメソッドには`async_trait`を使用：
 
 ```rust
 #[async_trait]
@@ -193,9 +193,9 @@ pub trait SecuritySourcePlugin: Send + Sync {
 }
 ```
 
-### Mocking for Tests
+### テスト用モック
 
-Use `mockall` with `#[automock]` attribute:
+`mockall`の`#[automock]`属性を使用：
 
 ```rust
 #[cfg_attr(test, mockall::automock)]
@@ -206,23 +206,23 @@ pub trait Database: Send + Sync {
 }
 ```
 
-### Configuration
+### 設定
 
-- All configuration via YAML files or environment variables
-- Environment variable expansion supported: `${VAR_NAME}`
-- See `docs/design.md` for full config structure
+- すべての設定はYAMLファイルまたは環境変数で指定可能
+- 環境変数展開をサポート: `${VAR_NAME}`
+- 完全な設定構造は`docs/design.md`を参照
 
-### API Token Format
+### APIトークン形式
 
-- Prefix: `rf_`
-- 32 bytes random (Base64 encoded)
-- Hashed with argon2id for storage
+- プレフィックス: `rf_`
+- 32バイトランダム（Base64エンコード）
+- argon2idでハッシュ化して保存
 
-## Plugin Architecture
+## プラグインアーキテクチャ
 
-### Registry Plugins
+### レジストリプラグイン
 
-Implement `RegistryPlugin` trait for new package registries:
+新しいパッケージレジストリには`RegistryPlugin`トレイトを実装：
 
 ```rust
 #[async_trait]
@@ -238,9 +238,9 @@ pub trait RegistryPlugin: Send + Sync {
 }
 ```
 
-### Security Source Plugins
+### セキュリティソースプラグイン
 
-Implement `SecuritySourcePlugin` trait for new security data sources:
+新しいセキュリティデータソースには`SecuritySourcePlugin`トレイトを実装：
 
 ```rust
 #[async_trait]
@@ -255,9 +255,9 @@ pub trait SecuritySourcePlugin: Send + Sync {
 }
 ```
 
-### Cache Plugins
+### キャッシュプラグイン
 
-Implement `CachePlugin` trait for new cache backends:
+新しいキャッシュバックエンドには`CachePlugin`トレイトを実装：
 
 ```rust
 #[async_trait]
@@ -271,21 +271,21 @@ pub trait CachePlugin: Send + Sync {
 }
 ```
 
-## Key Dependencies
+## 主要な依存クレート
 
 ```toml
-# Core
+# コア
 tokio = { version = "1", features = ["full"] }
 axum = { version = "0.7", features = ["macros"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 serde_yaml = "0.9"
 
-# Database
+# データベース
 rusqlite = { version = "0.31", features = ["bundled"] }
 tokio-rusqlite = "0.5"
 
-# HTTP Client
+# HTTPクライアント
 reqwest = { version = "0.12", features = ["json", "gzip"] }
 
 # OpenTelemetry
@@ -294,117 +294,110 @@ opentelemetry-otlp = "0.15"
 tracing = "0.1"
 tracing-opentelemetry = "0.23"
 
-# Security
+# セキュリティ
 argon2 = "0.5"
 semver = "1"
 
-# Error handling
+# エラーハンドリング
 thiserror = "1"
 anyhow = "1"
 
-# Testing
+# テスト
 mockall = "0.12"
 axum-test = "14"
 wiremock = "0.6"
 tempfile = "3"
 ```
 
-## HTTP Endpoints
+## HTTPエンドポイント
 
-### Proxy Endpoints
-- `GET /pypi/*` - PyPI Simple API proxy
-- `GET /go/*` - Go Module proxy
-- `GET /cargo/*` - Cargo Sparse Index proxy
-- `GET /v2/*` - Docker Registry v2 proxy
+### プロキシエンドポイント
+- `GET /pypi/*` - PyPI Simple APIプロキシ
+- `GET /go/*` - Go Moduleプロキシ
+- `GET /cargo/*` - Cargo Sparse Indexプロキシ
+- `GET /v2/*` - Docker Registry v2プロキシ
 
-### Management Endpoints
-- `GET /health` - Health check (no auth)
-- `GET /metrics` - Prometheus metrics (no auth)
-- `GET /ui/*` - Web UI static files
-- `GET/POST/PUT/DELETE /api/*` - Management API
+### 管理エンドポイント
+- `GET /health` - ヘルスチェック（認証不要）
+- `GET /metrics` - Prometheusメトリクス（認証不要）
+- `GET /ui/*` - Web UI静的ファイル
+- `GET/POST/PUT/DELETE /api/*` - 管理API
 
-### API Endpoints
-- `GET /api/dashboard` - Dashboard statistics
-- `GET /api/blocks` - Block event logs
-- `GET /api/security-sources` - Security source status
-- `POST /api/security-sources/{name}/sync` - Manual sync trigger
-- `GET /api/cache/stats` - Cache statistics
-- `DELETE /api/cache` - Clear cache
-- `GET/POST/PUT/DELETE /api/rules` - Custom block rules
-- `GET/POST/DELETE /api/tokens` - API token management
+### APIエンドポイント
+- `GET /api/dashboard` - ダッシュボード統計
+- `GET /api/blocks` - ブロックイベントログ
+- `GET /api/security-sources` - セキュリティソース状態
+- `POST /api/security-sources/{name}/sync` - 手動同期トリガー
+- `GET /api/cache/stats` - キャッシュ統計
+- `DELETE /api/cache` - キャッシュクリア
+- `GET/POST/PUT/DELETE /api/rules` - カスタムブロックルール
+- `GET/POST/DELETE /api/tokens` - APIトークン管理
 
-## Database Schema
+## データベーススキーマ
 
-Main tables in SQLite:
-- `blocked_packages` - Packages blocked by security sources
-- `sync_status` - Security source sync state
-- `api_tokens` - Client API tokens (hashed)
-- `block_logs` - Block event audit log
-- `custom_rules` - User-defined block rules
+SQLiteの主要テーブル：
+- `blocked_packages` - セキュリティソースによりブロックされたパッケージ
+- `sync_status` - セキュリティソースの同期状態
+- `api_tokens` - クライアントAPIトークン（ハッシュ化）
+- `block_logs` - ブロックイベント監査ログ
+- `custom_rules` - ユーザー定義ブロックルール
 
-## Implementation Status
+## 実装状況
 
-Current status: **Pre-implementation phase**
+現在のステータス: **実装前フェーズ**
 
-The repository contains comprehensive design documents but no source code yet. Implementation should follow the phased approach in `docs/tasks.md`:
+リポジトリには包括的な設計ドキュメントが含まれていますが、ソースコードはまだありません。実装は`docs/tasks.md`のフェーズに従って進めてください：
 
-1. Phase 1: Project foundation (Cargo.toml, directory structure)
-2. Phase 2: Core infrastructure (config, models, database)
-3. Phase 3: Sync infrastructure (retry, rate-limit, scheduler)
-4. Phase 4: Security source plugins (OSV, OpenSSF, custom)
-5. Phase 5: Cache layer
-6. Phase 6: Registry plugins (PyPI, Go, Cargo, Docker)
-7. Phase 7: Authentication
-8. Phase 8: HTTP server
-9. Phase 9: OpenTelemetry integration
-10. Phase 10: Web UI
-11. Phase 11: Integration and deployment
+1. フェーズ1: プロジェクト基盤（Cargo.toml、ディレクトリ構造）
+2. フェーズ2: コアインフラストラクチャ（設定、モデル、データベース）
+3. フェーズ3: 同期インフラストラクチャ（リトライ、レートリミット、スケジューラー）
+4. フェーズ4: セキュリティソースプラグイン（OSV、OpenSSF、カスタム）
+5. フェーズ5: キャッシュレイヤー
+6. フェーズ6: レジストリプラグイン（PyPI、Go、Cargo、Docker）
+7. フェーズ7: 認証
+8. フェーズ8: HTTPサーバー
+9. フェーズ9: OpenTelemetry統合
+10. フェーズ10: Web UI
+11. フェーズ11: 統合・デプロイ
 
-## Important Notes for AI Assistants
+## AIアシスタント向け重要事項
 
-### When implementing features:
-1. **Always write tests first** (TDD)
-2. **Use the trait-based plugin architecture** as defined in design.md
-3. **Follow the phased implementation plan** in tasks.md
-4. **Keep modules decoupled** - use dependency injection via traits
-5. **Apply exponential backoff** for external API calls
-6. **Respect rate limits** for security data sources
+### 機能実装時の注意点
+1. **必ずテストを先に書く**（TDD）
+2. **design.mdで定義されたトレイトベースのプラグインアーキテクチャを使用する**
+3. **tasks.mdのフェーズ別実装計画に従う**
+4. **モジュールの疎結合を保つ** - トレイトを使った依存性注入を活用
+5. **外部API呼び出しには指数バックオフを適用する**
+6. **セキュリティデータソースのレートリミットを尊重する**
 
-### Security considerations:
-- Never log sensitive tokens
-- Hash all stored credentials with argon2id
-- Use TLS 1.2+ for upstream connections
-- Validate all user input
-- Apply rate limiting on auth failures
+### セキュリティ上の考慮事項
+- 機密トークンをログに出力しない
+- 保存する認証情報はすべてargon2idでハッシュ化
+- アップストリーム接続にはTLS 1.2以上を使用
+- すべてのユーザー入力を検証
+- 認証失敗にはレートリミットを適用
 
-### Performance targets:
-- Cache hit response: <50ms
-- Cache miss response: upstream latency + <100ms
-- Security DB check: <1ms
-- Auth token validation: <0.5ms
-- Memory usage (idle): <256MB
+### パフォーマンス目標
+- キャッシュヒット時のレスポンス: 50ms以内
+- キャッシュミス時のレスポンス: アップストリームレイテンシ + 100ms以内
+- セキュリティDBチェック: 1ms以内
+- 認証トークン検証: 0.5ms以内
+- メモリ使用量（アイドル時）: 256MB以下
 
-### Documentation language:
-The documentation in `docs/` is written in Japanese. Key terms:
-- エコシステム (ecosystem) - package ecosystem (pypi, go, cargo, docker)
-- プラグイン (plugin) - plugin module
-- 同期 (sync) - synchronization
-- ブロック (block) - blocking malicious packages
-
-## Quick Start (After Implementation)
+## クイックスタート（実装完了後）
 
 ```bash
-# Build the project
+# プロジェクトをビルド
 cargo build --release
 
-# Run with default config
+# デフォルト設定で実行
 ./target/release/registry-firewall --config configs/config.yaml
 
-# Run with Docker
+# Dockerで実行
 docker-compose -f deployments/docker-compose/docker-compose.yaml up
 ```
 
-## Configuration Example
+## 設定例
 
 ```yaml
 server:
@@ -441,6 +434,6 @@ otel:
   endpoint: "http://otel-collector:4317"
 ```
 
-## License
+## ライセンス
 
 Apache License 2.0

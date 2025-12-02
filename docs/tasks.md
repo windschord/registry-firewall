@@ -21,14 +21,14 @@ Rustプロジェクトの基盤を作成する
 - edition = "2021"
 
 **受入基準**:
-- [ ] `Cargo.toml`が作成され、すべての依存関係が定義されている
-- [ ] `cargo check`がエラーなく通過する
-- [ ] `src/main.rs`が存在し、`fn main()`が定義されている
-- [ ] `src/lib.rs`が存在する
+- [x] `Cargo.toml`が作成され、すべての依存関係が定義されている
+- [x] `cargo check`がエラーなく通過する
+- [x] `src/main.rs`が存在し、`fn main()`が定義されている
+- [x] `src/lib.rs`が存在する
 
 **依存関係**: なし
 **推定工数**: 15分
-**ステータス**: `TODO`
+**ステータス**: `DONE`
 
 #### タスク1.2: ディレクトリ構造の作成
 **説明**:
@@ -42,25 +42,25 @@ design.mdで定義されたディレクトリ構造を作成する
 - 各`mod.rs`には`// TODO: implement`コメントを記載
 
 **受入基準**:
-- [ ] `src/config/mod.rs`が存在する
-- [ ] `src/server/mod.rs`が存在する
-- [ ] `src/auth/mod.rs`が存在する
-- [ ] `src/sync/mod.rs`が存在する
-- [ ] `src/plugins/mod.rs`が存在する
-- [ ] `src/plugins/registry/mod.rs`が存在する
-- [ ] `src/plugins/security/mod.rs`が存在する
-- [ ] `src/plugins/cache/mod.rs`が存在する
-- [ ] `src/database/mod.rs`が存在する
-- [ ] `src/otel/mod.rs`が存在する
-- [ ] `src/webui/mod.rs`が存在する
-- [ ] `src/models/mod.rs`が存在する
-- [ ] `src/error.rs`が存在する
-- [ ] `tests/common/mod.rs`が存在する
-- [ ] `cargo check`がエラーなく通過する
+- [x] `src/config/mod.rs`が存在する
+- [x] `src/server/mod.rs`が存在する
+- [x] `src/auth/mod.rs`が存在する
+- [x] `src/sync/mod.rs`が存在する
+- [x] `src/plugins/mod.rs`が存在する
+- [x] `src/plugins/registry/mod.rs`が存在する
+- [x] `src/plugins/security/mod.rs`が存在する
+- [x] `src/plugins/cache/mod.rs`が存在する
+- [x] `src/database/mod.rs`が存在する
+- [x] `src/otel/mod.rs`が存在する
+- [x] `src/webui/mod.rs`が存在する
+- [x] `src/models/mod.rs`が存在する
+- [x] `src/error.rs`が存在する
+- [x] `tests/common/mod.rs`が存在する
+- [x] `cargo check`がエラーなく通過する
 
 **依存関係**: タスク1.1
 **推定工数**: 20分
-**ステータス**: `TODO`
+**ステータス**: `DONE`
 
 #### タスク1.3: 共通エラー型の定義
 **説明**:

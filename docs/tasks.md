@@ -79,15 +79,15 @@ TDDで`src/error.rs`にアプリケーション共通のエラー型を実装す
 - `AuthError`, `PluginError`, `CacheError`, `DbError`, `SyncError`を定義
 
 **受入基準**:
-- [ ] `AppError` enumが定義されている
-- [ ] 各エラーバリアントが`#[error("...")]`でメッセージを持つ
-- [ ] `From`トレイトによる変換が実装されている
-- [ ] テストが3つ以上存在する
-- [ ] `cargo test error`が通過する
+- [x] `AppError` enumが定義されている
+- [x] 各エラーバリアントが`#[error("...")]`でメッセージを持つ
+- [x] `From`トレイトによる変換が実装されている
+- [x] テストが3つ以上存在する
+- [x] `cargo test error`が通過する
 
 **依存関係**: タスク1.2
 **推定工数**: 25分
-**ステータス**: `TODO`
+**ステータス**: `DONE`
 
 ---
 

@@ -51,6 +51,7 @@ async-trait = "0.1"
 thiserror = "1"
 anyhow = "1"
 config = "0.14"
+url = "2"
 
 # Embed static files
 rust-embed = "8"

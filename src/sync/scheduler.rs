@@ -364,15 +364,36 @@ mod tests {
     use std::sync::atomic::{AtomicU32, Ordering};
     use tokio::time::timeout;
 
-    /// Test implementation of Syncable for testing purposes
+    /// Test implementation of `Syncable` for testing scheduler behavior.
+    ///
+    /// This struct tracks sync invocations via an atomic counter and returns
+    /// configurable results. Used to verify:
+    /// - Sync calls are made at expected intervals
+    /// - Error handling works correctly
+    /// - Multiple sources sync independently
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// let source = TestSource::new("test", 3600);
+    /// let sync_count = source.sync_count();
+    ///
+    /// // After scheduler runs...
+    /// assert_eq!(sync_count.load(Ordering::SeqCst), 1);
+    /// ```
     struct TestSource {
+        /// Name identifier for this source
         name: String,
+        /// Interval between sync operations
         interval: Duration,
+        /// Counter tracking number of sync() calls
         sync_count: Arc<AtomicU32>,
+        /// Configurable result to return from sync()
         sync_result: Arc<RwLock<Result<SyncResult, SyncError>>>,
     }
 
     impl TestSource {
+        /// Create a new test source with given name and interval
         fn new(name: &str, interval_secs: u64) -> Self {
             Self {
                 name: name.to_string(),
@@ -382,11 +403,13 @@ mod tests {
             }
         }
 
+        /// Configure the result that sync() will return
         fn with_result(mut self, result: Result<SyncResult, SyncError>) -> Self {
             self.sync_result = Arc::new(RwLock::new(result));
             self
         }
 
+        /// Get a handle to the sync counter for assertions
         fn sync_count(&self) -> Arc<AtomicU32> {
             self.sync_count.clone()
         }

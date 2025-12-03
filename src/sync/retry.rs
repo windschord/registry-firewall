@@ -89,9 +89,9 @@ impl RetryManager {
         let capped = base.min(self.config.max_backoff_secs as f64);
 
         let delay = if self.config.jitter {
-            // Add jitter: 50-100% of the calculated backoff
-            let jitter = rand::thread_rng().gen_range(0.5..1.0);
-            capped * jitter
+            // Add jitter: ±25% variance for more balanced distribution
+            let jitter_factor = rand::thread_rng().gen_range(0.75..1.25);
+            capped * jitter_factor
         } else {
             capped
         };
@@ -274,7 +274,7 @@ mod tests {
         assert_eq!(manager.calculate_backoff(10), Duration::from_secs(60));
     }
 
-    // Test 7: Jitter reduces backoff to 50-100% range
+    // Test 7: Jitter applies ±25% variance to backoff
     #[test]
     fn test_jitter_within_range() {
         let manager = RetryManager::new(RetryConfig {
@@ -289,10 +289,12 @@ mod tests {
         for _ in 0..100 {
             let backoff = manager.calculate_backoff(0);
             // Without jitter: 10 seconds
-            // With jitter: 5-10 seconds (50-100%)
+            // With jitter: 7.5-12.5 seconds (±25% variance)
+            let min_expected = Duration::from_secs_f64(7.5);
+            let max_expected = Duration::from_secs_f64(12.5);
             assert!(
-                backoff >= Duration::from_secs(5) && backoff <= Duration::from_secs(10),
-                "Backoff {:?} should be between 5-10 seconds",
+                backoff >= min_expected && backoff <= max_expected,
+                "Backoff {:?} should be between 7.5-12.5 seconds",
                 backoff
             );
         }

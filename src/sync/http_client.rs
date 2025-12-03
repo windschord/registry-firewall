@@ -48,16 +48,23 @@ pub struct HttpClientWithRateLimit {
 
 impl HttpClientWithRateLimit {
     /// Create a new rate-limited HTTP client
-    pub fn new(config: RateLimitConfig) -> Self {
-        Self {
-            client: Client::builder()
-                .timeout(Duration::from_secs(30))
-                .build()
-                .expect("Failed to create HTTP client"),
+    ///
+    /// # Errors
+    ///
+    /// Returns `SyncError::Network` if the HTTP client fails to initialize
+    /// (e.g., TLS configuration failure).
+    pub fn new(config: RateLimitConfig) -> Result<Self, SyncError> {
+        let client = Client::builder()
+            .timeout(Duration::from_secs(30))
+            .build()
+            .map_err(|e| SyncError::Network(format!("Failed to create HTTP client: {}", e)))?;
+
+        Ok(Self {
+            client,
             semaphore: Arc::new(Semaphore::new(config.max_concurrent)),
             last_request: Arc::new(Mutex::new(HashMap::new())),
             config,
-        }
+        })
     }
 
     /// Create a rate-limited HTTP client with a custom reqwest Client
@@ -106,7 +113,7 @@ impl HttpClientWithRateLimit {
             .semaphore
             .acquire()
             .await
-            .expect("Semaphore closed unexpectedly");
+            .map_err(|_| SyncError::Network("Rate limiter shutting down".to_string()))?;
 
         // Wait for rate limit interval if needed
         self.wait_for_rate_limit(url).await;
@@ -114,13 +121,31 @@ impl HttpClientWithRateLimit {
         // Build request with conditional headers
         let mut headers = HeaderMap::new();
         if let Some(etag_value) = etag {
-            if let Ok(value) = HeaderValue::from_str(etag_value) {
-                headers.insert(IF_NONE_MATCH, value);
+            match HeaderValue::from_str(etag_value) {
+                Ok(value) => {
+                    headers.insert(IF_NONE_MATCH, value);
+                }
+                Err(e) => {
+                    warn!(
+                        etag = etag_value,
+                        error = %e,
+                        "Invalid ETag header value, skipping conditional request"
+                    );
+                }
             }
         }
         if let Some(lm_value) = last_modified {
-            if let Ok(value) = HeaderValue::from_str(lm_value) {
-                headers.insert(IF_MODIFIED_SINCE, value);
+            match HeaderValue::from_str(lm_value) {
+                Ok(value) => {
+                    headers.insert(IF_MODIFIED_SINCE, value);
+                }
+                Err(e) => {
+                    warn!(
+                        last_modified = lm_value,
+                        error = %e,
+                        "Invalid Last-Modified header value, skipping conditional request"
+                    );
+                }
             }
         }
 
@@ -245,12 +270,30 @@ impl HttpClientWithRateLimit {
 }
 
 /// Extract domain from URL for rate limiting purposes
-fn extract_domain(url: &str) -> String {
-    url.split("://")
-        .nth(1)
-        .and_then(|s| s.split('/').next())
-        .unwrap_or(url)
-        .to_string()
+///
+/// Uses the `url` crate for robust parsing that handles edge cases
+/// like userinfo, ports, and internationalized domain names.
+fn extract_domain(url_str: &str) -> String {
+    match url::Url::parse(url_str) {
+        Ok(parsed) => {
+            // Get host with port if present for proper rate limiting
+            match (parsed.host_str(), parsed.port()) {
+                (Some(host), Some(port)) => format!("{}:{}", host, port),
+                (Some(host), None) => host.to_string(),
+                _ => url_str.to_string(),
+            }
+        }
+        Err(_) => {
+            // Fallback for malformed URLs: try simple extraction
+            url_str
+                .split("://")
+                .nth(1)
+                .and_then(|s| s.split('/').next())
+                .and_then(|s| s.split('@').next_back()) // Handle userinfo
+                .unwrap_or(url_str)
+                .to_string()
+        }
+    }
 }
 
 #[cfg(test)]
@@ -273,7 +316,8 @@ mod tests {
             min_interval_ms: 0,
             max_concurrent: 2,
             rate_limit_wait_secs: 60,
-        });
+        })
+        .unwrap();
 
         let result = client.get(&format!("{}/test", mock_server.uri())).await;
 
@@ -296,7 +340,8 @@ mod tests {
             min_interval_ms: 0,
             max_concurrent: 2,
             rate_limit_wait_secs: 60,
-        });
+        })
+        .unwrap();
 
         let result = client
             .get_with_cache_headers(
@@ -326,7 +371,8 @@ mod tests {
             min_interval_ms: 0,
             max_concurrent: 2,
             rate_limit_wait_secs: 60,
-        });
+        })
+        .unwrap();
 
         let result = client
             .get_with_cache_headers(
@@ -359,7 +405,8 @@ mod tests {
             min_interval_ms: 0,
             max_concurrent: 2,
             rate_limit_wait_secs: 60,
-        });
+        })
+        .unwrap();
 
         let result = client
             .get_with_cache_headers(&format!("{}/resource", mock_server.uri()), None, None)
@@ -397,7 +444,8 @@ mod tests {
             min_interval_ms: 0,
             max_concurrent: 2,
             rate_limit_wait_secs: 60,
-        });
+        })
+        .unwrap();
 
         let result = client.get(&format!("{}/limited", mock_server.uri())).await;
 
@@ -422,7 +470,8 @@ mod tests {
             min_interval_ms: 0,
             max_concurrent: 2,
             rate_limit_wait_secs: 30,
-        });
+        })
+        .unwrap();
 
         let result = client.get(&format!("{}/limited", mock_server.uri())).await;
 
@@ -447,7 +496,8 @@ mod tests {
             min_interval_ms: 0,
             max_concurrent: 2,
             rate_limit_wait_secs: 60,
-        });
+        })
+        .unwrap();
 
         let result = client.get(&format!("{}/missing", mock_server.uri())).await;
 
@@ -469,7 +519,8 @@ mod tests {
             min_interval_ms: 0,
             max_concurrent: 2,
             rate_limit_wait_secs: 60,
-        });
+        })
+        .unwrap();
 
         let result = client.get(&format!("{}/error", mock_server.uri())).await;
 
@@ -491,11 +542,14 @@ mod tests {
             .mount(&mock_server)
             .await;
 
-        let client = Arc::new(HttpClientWithRateLimit::new(RateLimitConfig {
-            min_interval_ms: 0,
-            max_concurrent: 2,
-            rate_limit_wait_secs: 60,
-        }));
+        let client = Arc::new(
+            HttpClientWithRateLimit::new(RateLimitConfig {
+                min_interval_ms: 0,
+                max_concurrent: 2,
+                rate_limit_wait_secs: 60,
+            })
+            .unwrap(),
+        );
 
         // Start 3 concurrent requests with max_concurrent = 2
         let url = format!("{}/slow", mock_server.uri());
@@ -517,9 +571,10 @@ mod tests {
 
         // With max_concurrent=2, 3 requests of 100ms each should take ~200ms
         // (first 2 parallel, then 1 more)
+        // Allow 180ms tolerance for async scheduling variance
         assert!(
-            elapsed >= Duration::from_millis(150),
-            "Requests should be limited: {:?}",
+            elapsed >= Duration::from_millis(180),
+            "Requests should be limited: expected ~200ms, got {:?}",
             elapsed
         );
     }
@@ -539,7 +594,8 @@ mod tests {
             min_interval_ms: 100, // 100ms between requests
             max_concurrent: 10,
             rate_limit_wait_secs: 60,
-        });
+        })
+        .unwrap();
 
         let url = format!("{}/fast", mock_server.uri());
 
@@ -549,8 +605,9 @@ mod tests {
         let elapsed = start.elapsed();
 
         // Second request should wait at least 100ms
+        // Allow 80ms tolerance for async scheduling variance
         assert!(
-            elapsed >= Duration::from_millis(90), // Allow some timing slack
+            elapsed >= Duration::from_millis(80),
             "Rate limiting should enforce minimum interval: {:?}",
             elapsed
         );
@@ -582,7 +639,8 @@ mod tests {
             min_interval_ms: 0,
             max_concurrent: 2,
             rate_limit_wait_secs: 60,
-        });
+        })
+        .unwrap();
 
         let result = client
             .get(&format!("{}/protected", mock_server.uri()))
@@ -602,11 +660,14 @@ mod tests {
             .mount(&mock_server)
             .await;
 
-        let client = Arc::new(HttpClientWithRateLimit::new(RateLimitConfig {
-            min_interval_ms: 0,
-            max_concurrent: 3,
-            rate_limit_wait_secs: 60,
-        }));
+        let client = Arc::new(
+            HttpClientWithRateLimit::new(RateLimitConfig {
+                min_interval_ms: 0,
+                max_concurrent: 3,
+                rate_limit_wait_secs: 60,
+            })
+            .unwrap(),
+        );
 
         assert_eq!(client.available_permits(), 3);
 

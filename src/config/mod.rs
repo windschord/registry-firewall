@@ -574,7 +574,8 @@ pub enum ConfigError {
 /// Supports `${VAR_NAME}` syntax
 fn expand_env_vars(input: &str) -> String {
     let mut result = input.to_string();
-    let re = regex_lite::Regex::new(r"\$\{([^}]+)\}").unwrap();
+    let re = regex_lite::Regex::new(r"\$\{([^}]+)\}")
+        .expect("Invalid regex pattern for environment variable expansion");
 
     for cap in re.captures_iter(input) {
         let var_name = &cap[1];

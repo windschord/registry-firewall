@@ -231,17 +231,17 @@ TDDで`src/sync/retry.rs`にリトライ機能を実装する
 - `RetryableError`トレイトを定義
 
 **受入基準**:
-- [ ] `RetryConfig`構造体が定義されている（max_retries, initial_backoff_secs, max_backoff_secs, backoff_multiplier, jitter）
-- [ ] `RetryableError`トレイトが定義されている
-- [ ] `RetryManager::execute()`が実装されている
-- [ ] 指数バックオフが正しく計算される
-- [ ] ジッター付きバックオフが実装されている
-- [ ] テストが5つ以上存在する
-- [ ] `cargo test retry`が通過する
+- [x] `RetryConfig`構造体が定義されている（max_retries, initial_backoff_secs, max_backoff_secs, backoff_multiplier, jitter）
+- [x] `RetryableError`トレイトが定義されている
+- [x] `RetryManager::execute()`が実装されている
+- [x] 指数バックオフが正しく計算される
+- [x] ジッター付きバックオフが実装されている
+- [x] テストが5つ以上存在する（12テスト）
+- [x] `cargo test retry`が通過する
 
 **依存関係**: タスク1.3
 **推定工数**: 40分
-**ステータス**: `TODO`
+**ステータス**: `DONE`
 
 #### タスク3.2: レートリミット付きHTTPクライアントの実装
 **説明**:
@@ -264,19 +264,19 @@ TDDで`src/sync/http_client.rs`にレートリミット機能付きHTTPクライ
 - `wiremock`でモックサーバーを使用してテスト
 
 **受入基準**:
-- [ ] `RateLimitConfig`構造体が定義されている
-- [ ] `HttpClientWithRateLimit`構造体が定義されている
-- [ ] `get(url)`メソッドが実装されている
-- [ ] `get_with_cache_headers(url, etag, last_modified)`メソッドが実装されている
-- [ ] `ConditionalResponse` enumが定義されている（NotModified, Modified）
-- [ ] ドメイン単位のリクエスト間隔制御が実装されている
-- [ ] 同時リクエスト数制限が実装されている
-- [ ] テストが5つ以上存在する
-- [ ] `cargo test http_client`が通過する
+- [x] `RateLimitConfig`構造体が定義されている
+- [x] `HttpClientWithRateLimit`構造体が定義されている
+- [x] `get(url)`メソッドが実装されている
+- [x] `get_with_cache_headers(url, etag, last_modified)`メソッドが実装されている
+- [x] `ConditionalResponse` enumが定義されている（NotModified, Modified）
+- [x] ドメイン単位のリクエスト間隔制御が実装されている
+- [x] 同時リクエスト数制限が実装されている
+- [x] テストが5つ以上存在する（14テスト）
+- [x] `cargo test http_client`が通過する
 
 **依存関係**: タスク2.1
 **推定工数**: 50分
-**ステータス**: `TODO`
+**ステータス**: `DONE`
 
 #### タスク3.3: 同期スケジューラーの実装
 **説明**:
@@ -298,18 +298,18 @@ TDDで`src/sync/scheduler.rs`に自動同期スケジューラーを実装する
 - `tokio::time::pause()`を使ってテスト
 
 **受入基準**:
-- [ ] `SchedulerConfig`構造体が定義されている
-- [ ] `SyncScheduler`構造体が定義されている
-- [ ] `SyncScheduler::run()`が実装されている（バックグラウンドタスク）
-- [ ] `SyncScheduler::trigger_sync(plugin_name)`が実装されている
-- [ ] ジッター付き次回実行時刻計算が実装されている
-- [ ] グレースフルシャットダウンが実装されている
-- [ ] テストが4つ以上存在する
-- [ ] `cargo test scheduler`が通過する
+- [x] `SchedulerConfig`構造体が定義されている
+- [x] `SyncScheduler`構造体が定義されている
+- [x] `SyncScheduler::run()`が実装されている（バックグラウンドタスク）
+- [x] `SyncScheduler::trigger_sync(plugin_name)`が実装されている（ManualSyncHandleとして）
+- [x] ジッター付き次回実行時刻計算が実装されている
+- [x] グレースフルシャットダウンが実装されている
+- [x] テストが4つ以上存在する（12テスト）
+- [x] `cargo test scheduler`が通過する
 
 **依存関係**: タスク3.1
 **推定工数**: 45分
-**ステータス**: `TODO`
+**ステータス**: `DONE`
 
 ---
 

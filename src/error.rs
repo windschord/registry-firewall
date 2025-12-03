@@ -72,6 +72,10 @@ pub enum DbError {
     #[error("Database error: {0}")]
     Sqlite(#[from] rusqlite::Error),
 
+    /// Async SQLite error
+    #[error("Async database error: {0}")]
+    AsyncSqlite(#[from] tokio_rusqlite::Error),
+
     /// Record not found
     #[error("Record not found")]
     NotFound,

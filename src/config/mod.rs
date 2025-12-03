@@ -573,18 +573,14 @@ pub enum ConfigError {
 ///
 /// Supports `${VAR_NAME}` syntax
 fn expand_env_vars(input: &str) -> String {
-    let mut result = input.to_string();
     let re = regex_lite::Regex::new(r"\$\{([^}]+)\}")
         .expect("Invalid regex pattern for environment variable expansion");
 
-    for cap in re.captures_iter(input) {
-        let var_name = &cap[1];
-        if let Ok(value) = std::env::var(var_name) {
-            result = result.replace(&format!("${{{}}}", var_name), &value);
-        }
-    }
-
-    result
+    re.replace_all(input, |caps: &regex_lite::Captures| {
+        let var_name = &caps[1];
+        std::env::var(var_name).unwrap_or_else(|_| caps[0].to_string())
+    })
+    .into_owned()
 }
 
 #[cfg(test)]

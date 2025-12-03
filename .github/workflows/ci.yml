@@ -116,6 +116,9 @@ jobs:
       - name: Generate coverage summary
         run: cargo llvm-cov --all-features --text | tee coverage-summary.txt
 
+      - name: Check coverage threshold (80%)
+        run: cargo llvm-cov --all-features --fail-under-lines 80
+
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
         with:

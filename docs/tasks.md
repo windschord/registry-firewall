@@ -112,17 +112,17 @@ TDDで`src/config/mod.rs`に設定構造体を実装する
 - design.mdの「設定ファイル構造」セクションを参照
 
 **受入基準**:
-- [ ] `Config`構造体が定義されている
-- [ ] `ServerConfig`, `AuthConfig`, `RegistryPluginConfig`等のサブ構造体が定義されている
-- [ ] `RetryConfig`, `RateLimitConfig`が定義されている
-- [ ] `Config::from_file(path)`メソッドが実装されている
-- [ ] `Config::from_env()`メソッドが実装されている
-- [ ] デシリアライズテストが通過する
-- [ ] `cargo test config`が通過する
+- [x] `Config`構造体が定義されている
+- [x] `ServerConfig`, `AuthConfig`, `RegistryPluginConfig`等のサブ構造体が定義されている
+- [x] `RetryConfig`, `RateLimitConfig`が定義されている
+- [x] `Config::from_file(path)`メソッドが実装されている
+- [x] `Config::from_env()`メソッドが実装されている
+- [x] デシリアライズテストが通過する
+- [x] `cargo test config`が通過する
 
 **依存関係**: タスク1.3
 **推定工数**: 40分
-**ステータス**: `TODO`
+**ステータス**: `DONE`
 
 #### タスク2.2: ドメインモデルの定義
 **説明**:
@@ -139,17 +139,17 @@ TDDで`src/models/`に共通のドメインモデルを実装する
 - `src/models/token.rs`: `Token`, `Client`, `CreateTokenRequest`
 
 **受入基準**:
-- [ ] `PackageRequest`構造体が定義されている
-- [ ] `BlockedPackage`構造体が定義されている
-- [ ] `BlockReason`構造体が定義されている
-- [ ] `Severity` enumが定義されている
-- [ ] `Token`構造体が定義されている
-- [ ] すべてのモデルが`Serialize`/`Deserialize`を実装
-- [ ] `cargo test models`が通過する
+- [x] `PackageRequest`構造体が定義されている
+- [x] `BlockedPackage`構造体が定義されている
+- [x] `BlockReason`構造体が定義されている
+- [x] `Severity` enumが定義されている
+- [x] `Token`構造体が定義されている
+- [x] すべてのモデルが`Serialize`/`Deserialize`を実装
+- [x] `cargo test models`が通過する
 
 **依存関係**: タスク1.3
 **推定工数**: 30分
-**ステータス**: `TODO`
+**ステータス**: `DONE`
 
 #### タスク2.3: データベーストレイトの定義
 **説明**:
@@ -166,17 +166,17 @@ TDDで`src/database/mod.rs`にデータベーストレイトを定義する
 - design.mdの「Database Trait」セクションを参照
 
 **受入基準**:
-- [ ] `Database`トレイトが定義されている
-- [ ] `insert_blocked_package`, `get_blocked_packages`, `is_blocked`メソッドが定義されている
-- [ ] `update_sync_status`, `get_sync_status`メソッドが定義されている
-- [ ] `create_token`, `get_token_by_hash`, `revoke_token`, `list_tokens`メソッドが定義されている
-- [ ] `insert_block_log`, `get_block_logs`メソッドが定義されている
-- [ ] `MockDatabase`が生成可能
-- [ ] `cargo test database`が通過する
+- [x] `Database`トレイトが定義されている
+- [x] `insert_blocked_package`, `get_blocked_packages`, `is_blocked`メソッドが定義されている
+- [x] `update_sync_status`, `get_sync_status`メソッドが定義されている
+- [x] `create_token`, `get_token_by_hash`, `revoke_token`, `list_tokens`メソッドが定義されている
+- [x] `insert_block_log`, `get_block_logs`メソッドが定義されている
+- [x] `MockDatabase`が生成可能
+- [x] `cargo test database`が通過する
 
 **依存関係**: タスク2.2
 **推定工数**: 25分
-**ステータス**: `TODO`
+**ステータス**: `DONE`
 
 #### タスク2.4: SQLite実装
 **説明**:
@@ -195,17 +195,17 @@ TDDで`src/database/sqlite.rs`にSQLite実装を作成する
 - マイグレーションは`src/database/migrations.rs`に定義
 
 **受入基準**:
-- [ ] `SqliteDatabase`構造体が定義されている
-- [ ] `Database`トレイトが実装されている
-- [ ] `SqliteDatabase::new(path)`でDB接続が作成される
-- [ ] `SqliteDatabase::new(":memory:")`でインメモリDBが作成される
-- [ ] 初回接続時にスキーマが自動作成される
-- [ ] 各CRUDメソッドのテストが存在する
-- [ ] `cargo test sqlite`が通過する
+- [x] `SqliteDatabase`構造体が定義されている
+- [x] `Database`トレイトが実装されている
+- [x] `SqliteDatabase::new(path)`でDB接続が作成される
+- [x] `SqliteDatabase::new(":memory:")`でインメモリDBが作成される
+- [x] 初回接続時にスキーマが自動作成される
+- [x] 各CRUDメソッドのテストが存在する
+- [x] `cargo test sqlite`が通過する
 
 **依存関係**: タスク2.3
 **推定工数**: 45分
-**ステータス**: `TODO`
+**ステータス**: `DONE`
 
 ---
 

@@ -65,6 +65,9 @@ flate2 = "1"
 # Concurrency control
 tokio-util = "0.7"
 
+# Regex (lightweight)
+regex-lite = "0.1"
+
 [dev-dependencies]
 mockall = "0.12"
 axum-test = "14"

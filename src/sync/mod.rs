@@ -12,19 +12,24 @@
 //! # Example
 //!
 //! ```ignore
-//! use registry_firewall::sync::{RetryManager, HttpClientWithRateLimit, SyncScheduler};
+//! use registry_firewall::sync::{RetryManager, HttpClientWithRateLimit};
 //! use registry_firewall::config::{RetryConfig, RateLimitConfig};
+//! use registry_firewall::error::SyncError;
 //!
-//! // Create a retry manager
-//! let retry = RetryManager::new(RetryConfig::default());
+//! async fn example() -> Result<(), SyncError> {
+//!     // Create a retry manager
+//!     let retry = RetryManager::new(RetryConfig::default());
 //!
-//! // Create a rate-limited HTTP client
-//! let client = HttpClientWithRateLimit::new(RateLimitConfig::default());
+//!     // Create a rate-limited HTTP client (returns Result)
+//!     let client = HttpClientWithRateLimit::new(RateLimitConfig::default())?;
 //!
-//! // Use retry manager to execute operations
-//! let result = retry.execute(|| async {
-//!     client.get("https://example.com/api").await
-//! }).await;
+//!     // Use retry manager to execute operations
+//!     let result = retry.execute(|| async {
+//!         client.get("https://example.com/api").await
+//!     }).await?;
+//!
+//!     Ok(())
+//! }
 //! ```
 
 pub mod http_client;

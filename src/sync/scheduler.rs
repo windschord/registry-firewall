@@ -200,22 +200,8 @@ impl SyncScheduler {
         info!(source = name, "Performing initial sync");
         Self::perform_sync(&source, &status, &config).await;
 
-        // Calculate next sync time with jitter
-        let jitter = if config.jitter_secs > 0 {
-            rand::thread_rng().gen_range(0..config.jitter_secs)
-        } else {
-            0
-        };
-        let next_sync = Instant::now() + interval + Duration::from_secs(jitter);
-
-        debug!(
-            source = name,
-            interval_secs = interval.as_secs(),
-            jitter_secs = jitter,
-            "Scheduled next sync"
-        );
-
-        let mut interval_timer = interval_at(next_sync, interval);
+        // Use fixed interval timer - jitter is applied consistently before each sync
+        let mut interval_timer = interval_at(Instant::now() + interval, interval);
 
         loop {
             tokio::select! {
@@ -224,13 +210,18 @@ impl SyncScheduler {
                     break;
                 }
                 _ = interval_timer.tick() => {
-                    // Add jitter to prevent all sources syncing at once
+                    // Apply jitter before each sync to prevent thundering herd
                     let jitter = if config.jitter_secs > 0 {
                         rand::thread_rng().gen_range(0..config.jitter_secs)
                     } else {
                         0
                     };
                     if jitter > 0 {
+                        debug!(
+                            source = name,
+                            jitter_secs = jitter,
+                            "Applying jitter before sync"
+                        );
                         tokio::time::sleep(Duration::from_secs(jitter)).await;
                     }
 
@@ -241,12 +232,16 @@ impl SyncScheduler {
         }
     }
 
-    async fn perform_sync(
+    /// Perform sync and return the result directly (for manual sync)
+    async fn perform_sync_with_result(
         source: &Arc<dyn Syncable>,
         status: &Arc<RwLock<HashMap<String, SyncStatus>>>,
         config: &SchedulerConfig,
-    ) {
+    ) -> Result<SyncResult, SyncError> {
         let name = source.name().to_string();
+
+        // Capture start time for next_sync calculation
+        let start_time = std::time::SystemTime::now();
 
         // Mark as in progress
         {
@@ -261,11 +256,14 @@ impl SyncScheduler {
             tokio::time::timeout(Duration::from_secs(config.sync_timeout_secs), source.sync())
                 .await;
 
-        // Update status
+        // Update status and return result
         let mut status_map = status.write().await;
         if let Some(s) = status_map.get_mut(&name) {
             s.in_progress = false;
             s.last_sync = Some(std::time::SystemTime::now());
+
+            // Calculate next sync from start time, not completion time
+            s.next_sync = Some(start_time + source.sync_interval());
 
             match result {
                 Ok(Ok(sync_result)) => {
@@ -278,11 +276,13 @@ impl SyncScheduler {
                             "Sync completed"
                         );
                     }
-                    s.last_result = Some(Ok(sync_result));
+                    s.last_result = Some(Ok(sync_result.clone()));
+                    Ok(sync_result)
                 }
                 Ok(Err(err)) => {
                     warn!(source = name, error = %err, "Sync failed");
                     s.last_result = Some(Err(err.to_string()));
+                    Err(err)
                 }
                 Err(_) => {
                     error!(
@@ -291,12 +291,21 @@ impl SyncScheduler {
                         "Sync timed out"
                     );
                     s.last_result = Some(Err("Sync timed out".to_string()));
+                    Err(SyncError::NetworkTimeout)
                 }
             }
-
-            // Update next sync time estimate
-            s.next_sync = Some(std::time::SystemTime::now() + source.sync_interval());
+        } else {
+            Err(SyncError::NotFound)
         }
+    }
+
+    /// Perform sync (for scheduled syncs where we don't need the result)
+    async fn perform_sync(
+        source: &Arc<dyn Syncable>,
+        status: &Arc<RwLock<HashMap<String, SyncStatus>>>,
+        config: &SchedulerConfig,
+    ) {
+        let _ = Self::perform_sync_with_result(source, status, config).await;
     }
 
     async fn handle_manual_sync(&self, request: ManualSyncRequest) {
@@ -308,18 +317,10 @@ impl SyncScheduler {
         match source {
             Some(source) => {
                 info!(source = request.source_name, "Manual sync triggered");
-                Self::perform_sync(source, &self.status, &self.config).await;
-
-                // Get the result from status
-                let status_map = self.status.read().await;
-                if let Some(status) = status_map.get(&request.source_name) {
-                    let result = match &status.last_result {
-                        Some(Ok(r)) => Ok(r.clone()),
-                        Some(Err(e)) => Err(SyncError::Network(e.clone())),
-                        None => Err(SyncError::Network("No result available".to_string())),
-                    };
-                    let _ = request.response.send(result).await;
-                }
+                // Call sync directly to preserve original error types
+                let result =
+                    Self::perform_sync_with_result(source, &self.status, &self.config).await;
+                let _ = request.response.send(result).await;
             }
             None => {
                 warn!(

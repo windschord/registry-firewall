@@ -30,7 +30,7 @@ pub enum AuthError {
 }
 
 /// Plugin-related errors
-#[derive(Debug, Error)]
+#[derive(Debug, Error, Clone, PartialEq)]
 pub enum PluginError {
     /// Plugin not found
     #[error("Plugin not found: {0}")]
@@ -122,7 +122,7 @@ pub enum SyncError {
 }
 
 /// Request parsing errors
-#[derive(Debug, Error)]
+#[derive(Debug, Error, Clone, PartialEq)]
 pub enum ParseError {
     /// Invalid path format
     #[error("Invalid path: {0}")]
@@ -162,7 +162,7 @@ pub enum ProxyError {
 }
 
 /// Metadata filtering errors
-#[derive(Debug, Error)]
+#[derive(Debug, Error, Clone, PartialEq)]
 pub enum FilterError {
     /// Invalid metadata format
     #[error("Invalid metadata format: {0}")]
@@ -174,7 +174,7 @@ pub enum FilterError {
 }
 
 /// OpenTelemetry-related errors
-#[derive(Debug, Error)]
+#[derive(Debug, Error, Clone, PartialEq)]
 pub enum OtelError {
     /// Failed to initialize tracer
     #[error("Failed to initialize tracer: {0}")]
@@ -418,5 +418,101 @@ mod tests {
             DbError::Migration("v2 failed".to_string()).to_string(),
             "Migration error: v2 failed"
         );
+    }
+
+    // Test 12: ParseError all variants
+    #[test]
+    fn test_parse_error_messages() {
+        assert_eq!(
+            ParseError::InvalidPath("/bad/path".to_string()).to_string(),
+            "Invalid path: /bad/path"
+        );
+        assert_eq!(
+            ParseError::MissingParameter("version".to_string()).to_string(),
+            "Missing parameter: version"
+        );
+        assert_eq!(
+            ParseError::InvalidPackageName("bad@name".to_string()).to_string(),
+            "Invalid package name: bad@name"
+        );
+        assert_eq!(
+            ParseError::InvalidVersion("not.a.version".to_string()).to_string(),
+            "Invalid version: not.a.version"
+        );
+    }
+
+    // Test 13: OtelError all variants
+    #[test]
+    fn test_otel_error_messages() {
+        assert_eq!(
+            OtelError::TracerInit("connection failed".to_string()).to_string(),
+            "Failed to initialize tracer: connection failed"
+        );
+        assert_eq!(
+            OtelError::MeterInit("invalid config".to_string()).to_string(),
+            "Failed to initialize meter: invalid config"
+        );
+        assert_eq!(
+            OtelError::Export("timeout".to_string()).to_string(),
+            "Export error: timeout"
+        );
+    }
+
+    // Test 14: FilterError all variants
+    #[test]
+    fn test_filter_error_messages() {
+        assert_eq!(
+            FilterError::InvalidFormat("not json".to_string()).to_string(),
+            "Invalid metadata format: not json"
+        );
+        assert_eq!(
+            FilterError::Parse("unexpected token".to_string()).to_string(),
+            "Parse error: unexpected token"
+        );
+    }
+
+    // Test 15: CacheError Serialization and Expired variants
+    #[test]
+    fn test_cache_error_all_variants() {
+        assert_eq!(
+            CacheError::Serialization("failed to encode".to_string()).to_string(),
+            "Cache serialization error: failed to encode"
+        );
+        assert_eq!(CacheError::Expired.to_string(), "Cache entry expired");
+        assert_eq!(CacheError::NotFound.to_string(), "Cache entry not found");
+    }
+
+    // Test 16: AppError Config and Internal variants
+    #[test]
+    fn test_app_error_config_and_internal() {
+        let config_err = AppError::Config("missing field".to_string());
+        assert_eq!(config_err.to_string(), "Configuration error: missing field");
+
+        let internal_err = AppError::Internal("unexpected state".to_string());
+        assert_eq!(internal_err.to_string(), "Internal error: unexpected state");
+    }
+
+    // Test 17: DbError from rusqlite::Error
+    #[test]
+    fn test_db_error_from_sqlite() {
+        // Create a rusqlite error by attempting an invalid operation
+        let sqlite_err = rusqlite::Error::InvalidParameterName("test".to_string());
+        let db_err: DbError = sqlite_err.into();
+
+        match db_err {
+            DbError::Sqlite(_) => (),
+            _ => panic!("Expected DbError::Sqlite"),
+        }
+    }
+
+    // Test 18: PluginError Clone and PartialEq
+    #[test]
+    fn test_plugin_error_clone_and_eq() {
+        let err1 = PluginError::NotFound("test".to_string());
+        let err2 = err1.clone();
+        assert_eq!(err1, err2);
+
+        let err3 = PluginError::NotFound("other".to_string());
+        assert_ne!(err1, err3);
     }
 }

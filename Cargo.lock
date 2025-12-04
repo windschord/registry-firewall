@@ -2116,6 +2116,7 @@ dependencies = [
  "config",
  "flate2",
  "git2",
+ "glob",
  "mockall",
  "opentelemetry",
  "opentelemetry-otlp",

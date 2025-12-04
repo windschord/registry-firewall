@@ -331,16 +331,16 @@ TDDで`src/plugins/security/traits.rs`にセキュリティソースプラグイ
 - design.mdの「SecuritySourcePlugin Trait」セクションを参照
 
 **受入基準**:
-- [ ] `SecuritySourcePlugin`トレイトが定義されている
-- [ ] `name()`, `supported_ecosystems()`, `sync()`, `sync_interval()`, `sync_status()`, `check_package()`, `get_blocked_packages()`メソッドが定義されている
-- [ ] `SyncResult`構造体が定義されている
-- [ ] `SyncStatus`構造体が定義されている
-- [ ] `MockSecuritySourcePlugin`が生成可能
-- [ ] `cargo test security::traits`が通過する
+- [x] `SecuritySourcePlugin`トレイトが定義されている
+- [x] `name()`, `supported_ecosystems()`, `sync()`, `sync_interval()`, `sync_status()`, `check_package()`, `get_blocked_packages()`メソッドが定義されている
+- [x] `SyncResult`構造体が定義されている
+- [x] `SyncStatus`構造体が定義されている
+- [x] `MockSecuritySourcePlugin`が生成可能
+- [x] `cargo test security::traits`が通過する
 
 **依存関係**: タスク2.2
 **推定工数**: 25分
-**ステータス**: `TODO`
+**ステータス**: `DONE`
 
 #### タスク4.2: OSVプラグインの実装
 **説明**:
@@ -364,19 +364,19 @@ TDDで`src/plugins/security/osv.rs`にOSVプラグインを実装する
 - `wiremock`でモックサーバーを使用
 
 **受入基準**:
-- [ ] `OsvPlugin`構造体が定義されている
-- [ ] `OsvConfig`構造体が定義されている
-- [ ] `SecuritySourcePlugin`トレイトが実装されている
-- [ ] `OsvEntry`, `Affected`, `Range`, `Event`構造体が定義されている
-- [ ] ETag/Last-Modifiedによるキャッシュ状態管理が実装されている
-- [ ] ZIP展開とOSV JSON解析が実装されている
-- [ ] バージョン範囲マッチングが実装されている
-- [ ] テストが6つ以上存在する
-- [ ] `cargo test osv`が通過する
+- [x] `OsvPlugin`構造体が定義されている
+- [x] `OsvConfig`構造体が定義されている
+- [x] `SecuritySourcePlugin`トレイトが実装されている
+- [x] `OsvEntry`, `Affected`, `Range`, `Event`構造体が定義されている
+- [x] ETag/Last-Modifiedによるキャッシュ状態管理が実装されている
+- [x] ZIP展開とOSV JSON解析が実装されている
+- [x] バージョン範囲マッチングが実装されている
+- [x] テストが6つ以上存在する (14 tests)
+- [x] `cargo test osv`が通過する
 
 **依存関係**: タスク4.1, タスク3.1, タスク3.2
 **推定工数**: 60分
-**ステータス**: `TODO`
+**ステータス**: `DONE`
 
 #### タスク4.3: OpenSSFプラグインの実装
 **説明**:
@@ -398,18 +398,18 @@ TDDで`src/plugins/security/openssf.rs`にOpenSSF Malicious Packagesプラグイ
 - OSV形式のJSON解析
 
 **受入基準**:
-- [ ] `OpenSsfPlugin`構造体が定義されている
-- [ ] `OpenSsfConfig`構造体が定義されている
-- [ ] `SecuritySourcePlugin`トレイトが実装されている
-- [ ] shallow clone機能が実装されている
-- [ ] sparse checkout機能が実装されている
-- [ ] コミットハッシュによる差分検出が実装されている
-- [ ] テストが4つ以上存在する
-- [ ] `cargo test openssf`が通過する
+- [x] `OpenSsfPlugin`構造体が定義されている
+- [x] `OpenSsfConfig`構造体が定義されている
+- [x] `SecuritySourcePlugin`トレイトが実装されている
+- [x] shallow clone機能が実装されている
+- [x] sparse checkout機能が実装されている
+- [x] コミットハッシュによる差分検出が実装されている
+- [x] テストが4つ以上存在する (12 tests)
+- [x] `cargo test openssf`が通過する
 
 **依存関係**: タスク4.1, タスク3.1
 **推定工数**: 50分
-**ステータス**: `TODO`
+**ステータス**: `DONE`
 
 #### タスク4.4: カスタムブロックリストプラグインの実装
 **説明**:
@@ -430,17 +430,17 @@ TDDで`src/plugins/security/custom.rs`にカスタムブロックリストプラ
 - ファイル変更監視は`notify`クレート（オプション）
 
 **受入基準**:
-- [ ] `CustomBlocklistPlugin`構造体が定義されている
-- [ ] `SecuritySourcePlugin`トレイトが実装されている
-- [ ] YAMLファイル形式が定義されている（ドキュメント）
-- [ ] セマンティックバージョン範囲（`>=1.0.0, <2.0.0`）が解析できる
-- [ ] ワイルドカードパターン（`malicious-*`）が解析できる
-- [ ] テストが4つ以上存在する
-- [ ] `cargo test custom`が通過する
+- [x] `CustomBlocklistPlugin`構造体が定義されている
+- [x] `SecuritySourcePlugin`トレイトが実装されている
+- [x] YAMLファイル形式が定義されている（ドキュメント）
+- [x] セマンティックバージョン範囲（`>=1.0.0, <2.0.0`）が解析できる
+- [x] ワイルドカードパターン（`malicious-*`）が解析できる
+- [x] テストが4つ以上存在する (16 tests)
+- [x] `cargo test custom`が通過する
 
 **依存関係**: タスク4.1
 **推定工数**: 35分
-**ステータス**: `TODO`
+**ステータス**: `DONE`
 
 #### タスク4.5: 最小経過時間プラグインの実装
 **説明**:
@@ -458,17 +458,17 @@ TDDで`src/plugins/security/minage.rs`に最小経過時間プラグインを実
 - 各レジストリAPIから公開日時を取得
 
 **受入基準**:
-- [ ] `MinAgePlugin`構造体が定義されている
-- [ ] `MinAgeConfig`構造体が定義されている（min_age_hours）
-- [ ] `SecuritySourcePlugin`トレイトが実装されている
-- [ ] `sync()`は何もしない（`SyncResult { skipped: true }`を返す）
-- [ ] `check_package()`がリアルタイムで公開日時をチェックする
-- [ ] テストが3つ以上存在する
-- [ ] `cargo test minage`が通過する
+- [x] `MinAgePlugin`構造体が定義されている
+- [x] `MinAgeConfig`構造体が定義されている（min_age_hours）
+- [x] `SecuritySourcePlugin`トレイトが実装されている
+- [x] `sync()`は何もしない（`SyncResult { skipped: true }`を返す）
+- [x] `check_package()`がリアルタイムで公開日時をチェックする
+- [x] テストが3つ以上存在する (13 tests)
+- [x] `cargo test minage`が通過する
 
 **依存関係**: タスク4.1
 **推定工数**: 30分
-**ステータス**: `TODO`
+**ステータス**: `DONE`
 
 ---
 

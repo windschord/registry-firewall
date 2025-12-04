@@ -59,6 +59,8 @@ pub struct CustomBlocklistConfig {
     pub sync_interval_secs: u64,
     /// Supported ecosystems
     pub ecosystems: Vec<String>,
+    /// Maximum file size in bytes (default: 10MB)
+    pub max_file_size: u64,
 }
 
 impl Default for CustomBlocklistConfig {
@@ -67,6 +69,7 @@ impl Default for CustomBlocklistConfig {
             file_path: PathBuf::from("/config/custom-blocklist.yaml"),
             sync_interval_secs: 300, // 5 minutes
             ecosystems: vec!["pypi".into(), "cargo".into(), "go".into(), "docker".into()],
+            max_file_size: 10 * 1024 * 1024, // 10MB
         }
     }
 }
@@ -216,6 +219,20 @@ impl CustomBlocklistPlugin {
         if !path.exists() {
             debug!(path = ?path, "Blocklist file does not exist, using empty rules");
             return Ok(BlocklistFile::default());
+        }
+
+        // Check file size before reading to prevent DoS
+        let metadata = tokio::fs::metadata(path).await.map_err(|e| {
+            SyncError::InvalidData(format!("Failed to get file metadata {:?}: {}", path, e))
+        })?;
+
+        if metadata.len() > self.config.max_file_size {
+            return Err(SyncError::InvalidData(format!(
+                "Blocklist file {:?} exceeds maximum size ({} > {} bytes)",
+                path,
+                metadata.len(),
+                self.config.max_file_size
+            )));
         }
 
         let contents = tokio::fs::read_to_string(path).await.map_err(|e| {
@@ -389,16 +406,8 @@ impl SecuritySourcePlugin for CustomBlocklistPlugin {
     }
 }
 
-/// Normalize ecosystem name for consistent comparison
-fn normalize_ecosystem(ecosystem: &str) -> String {
-    match ecosystem.to_lowercase().as_str() {
-        "pypi" => "pypi".to_string(),
-        "go" => "go".to_string(),
-        "crates.io" | "cargo" => "cargo".to_string(),
-        "docker" => "docker".to_string(),
-        other => other.to_lowercase(),
-    }
-}
+// Use shared normalize_ecosystem from parent module
+use super::normalize_ecosystem;
 
 #[cfg(test)]
 mod tests {
@@ -777,13 +786,13 @@ rules:
         assert!(blocked.iter().any(|b| b.package == "blocked2"));
     }
 
-    // Test 13: Ecosystem normalization
+    // Test 13: Ecosystem normalization (uses shared function from mod.rs)
     #[test]
     fn test_ecosystem_normalization() {
         assert_eq!(normalize_ecosystem("PyPI"), "pypi");
         assert_eq!(normalize_ecosystem("PYPI"), "pypi");
-        assert_eq!(normalize_ecosystem("Cargo"), "cargo");
-        assert_eq!(normalize_ecosystem("crates.io"), "cargo");
+        assert_eq!(normalize_ecosystem("Cargo"), "crates.io");
+        assert_eq!(normalize_ecosystem("crates.io"), "crates.io");
         assert_eq!(normalize_ecosystem("Go"), "go");
         assert_eq!(normalize_ecosystem("Docker"), "docker");
     }

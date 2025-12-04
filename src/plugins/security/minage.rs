@@ -26,6 +26,7 @@
 
 use async_trait::async_trait;
 use chrono::{DateTime, Duration as ChronoDuration, Utc};
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::RwLock;
@@ -71,14 +72,85 @@ pub trait PublishDateProvider: Send + Sync {
     ) -> Option<DateTime<Utc>>;
 }
 
-/// Real publish date provider that queries registry APIs
+/// Cached publish date entry
+#[derive(Clone)]
+struct CachedPublishDate {
+    /// The publish date (None if lookup failed)
+    date: Option<DateTime<Utc>>,
+    /// When this entry was cached
+    cached_at: DateTime<Utc>,
+}
+
+/// Real publish date provider that queries registry APIs with caching
 pub struct RegistryPublishDateProvider {
     http_client: Arc<HttpClientWithRateLimit>,
+    /// Cache of (ecosystem, package, version) -> publish date
+    cache: RwLock<HashMap<(String, String, String), CachedPublishDate>>,
+    /// How long to cache successful lookups (default: 24 hours)
+    cache_ttl: ChronoDuration,
+    /// How long to cache failed lookups (default: 1 hour)
+    negative_cache_ttl: ChronoDuration,
 }
 
 impl RegistryPublishDateProvider {
     pub fn new(http_client: Arc<HttpClientWithRateLimit>) -> Self {
-        Self { http_client }
+        Self {
+            http_client,
+            cache: RwLock::new(HashMap::new()),
+            cache_ttl: ChronoDuration::hours(24),
+            negative_cache_ttl: ChronoDuration::hours(1),
+        }
+    }
+
+    /// Check cache for a publish date
+    async fn get_cached(
+        &self,
+        ecosystem: &str,
+        package: &str,
+        version: &str,
+    ) -> Option<CachedPublishDate> {
+        let cache = self.cache.read().await;
+        let key = (
+            ecosystem.to_string(),
+            package.to_string(),
+            version.to_string(),
+        );
+
+        if let Some(entry) = cache.get(&key) {
+            let ttl = if entry.date.is_some() {
+                self.cache_ttl
+            } else {
+                self.negative_cache_ttl
+            };
+
+            if Utc::now() - entry.cached_at < ttl {
+                return Some(entry.clone());
+            }
+        }
+        None
+    }
+
+    /// Store a publish date in cache
+    async fn store_cached(
+        &self,
+        ecosystem: &str,
+        package: &str,
+        version: &str,
+        date: Option<DateTime<Utc>>,
+    ) {
+        let mut cache = self.cache.write().await;
+        let key = (
+            ecosystem.to_string(),
+            package.to_string(),
+            version.to_string(),
+        );
+        cache.insert(
+            key,
+            CachedPublishDate {
+                date,
+                cached_at: Utc::now(),
+            },
+        );
     }
 }
 
@@ -92,11 +164,29 @@ impl PublishDateProvider for RegistryPublishDateProvider {
     ) -> Option<DateTime<Utc>> {
         let normalized_eco = normalize_ecosystem(ecosystem);
 
-        match normalized_eco.as_str() {
-            "pypi" => self.get_pypi_publish_date(package, version).await,
-            "cargo" => self.get_crates_publish_date(package, version).await,
-            _ => None,
+        // Check cache first
+        if let Some(cached) = self.get_cached(&normalized_eco, package, version).await {
+            debug!(
+                ecosystem = %normalized_eco,
+                package = package,
+                version = version,
+                "Using cached publish date"
+            );
+            return cached.date;
         }
+
+        // Fetch from API
+        let result = match normalized_eco.as_str() {
+            "pypi" => self.get_pypi_publish_date(package, version).await,
+            "crates.io" => self.get_crates_publish_date(package, version).await,
+            _ => None,
+        };
+
+        // Cache the result (including None for failed lookups)
+        self.store_cached(&normalized_eco, package, version, result)
+            .await;
+
+        result
     }
 }
 
@@ -316,15 +406,8 @@ impl<P: PublishDateProvider + 'static> SecuritySourcePlugin for MinAgePlugin<P> 
     }
 }
 
-/// Normalize ecosystem name
-fn normalize_ecosystem(ecosystem: &str) -> String {
-    match ecosystem.to_lowercase().as_str() {
-        "pypi" => "pypi".to_string(),
-        "crates.io" | "cargo" => "cargo".to_string(),
-        "go" => "go".to_string(),
-        other => other.to_lowercase(),
-    }
-}
+// Use shared normalize_ecosystem from parent module
+use super::normalize_ecosystem;
 
 #[cfg(test)]
 mod tests {
@@ -574,13 +657,13 @@ mod tests {
         assert_eq!(status.status, SyncStatusValue::Success);
     }
 
-    // Test 12: Ecosystem normalization
+    // Test 12: Ecosystem normalization (uses shared function from mod.rs)
     #[test]
     fn test_ecosystem_normalization() {
         assert_eq!(normalize_ecosystem("PyPI"), "pypi");
         assert_eq!(normalize_ecosystem("PYPI"), "pypi");
-        assert_eq!(normalize_ecosystem("Cargo"), "cargo");
-        assert_eq!(normalize_ecosystem("crates.io"), "cargo");
+        assert_eq!(normalize_ecosystem("Cargo"), "crates.io");
+        assert_eq!(normalize_ecosystem("crates.io"), "crates.io");
         assert_eq!(normalize_ecosystem("Go"), "go");
     }
 

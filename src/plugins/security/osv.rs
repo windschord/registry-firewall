@@ -12,6 +12,26 @@
 //! - Go
 //! - crates.io
 //!
+//! # Known Limitations
+//!
+//! ## Semver Range Matching
+//!
+//! OSV vulnerability entries may specify affected versions using either:
+//! 1. **Explicit version lists** - Fully supported
+//! 2. **Semver ranges** (e.g., `>= 1.0.0, < 2.0.0`) - **Not currently supported**
+//!
+//! This plugin only blocks packages when their exact version appears in the explicit
+//! version list. Vulnerabilities specified only via semver ranges will not be detected.
+//!
+//! To properly support semver ranges, the plugin would need to:
+//! - Query the package registry for all available versions
+//! - Evaluate each version against the semver range constraints
+//! - Cache the expanded version list
+//!
+//! This is a known limitation that may result in some vulnerable packages not being
+//! blocked. For critical applications, consider supplementing with additional security
+//! sources that provide explicit version lists.
+//!
 //! # Example
 //!
 //! ```ignore
@@ -406,33 +426,29 @@ impl SecuritySourcePlugin for OsvPlugin {
     }
 }
 
-/// Normalize ecosystem name for consistent comparison
-fn normalize_ecosystem(ecosystem: &str) -> String {
-    match ecosystem.to_lowercase().as_str() {
-        "pypi" => "pypi".to_string(),
-        "go" => "go".to_string(),
-        "crates.io" | "cargo" => "crates.io".to_string(),
-        other => other.to_lowercase(),
-    }
-}
+// Use shared normalize_ecosystem from parent module
+use super::normalize_ecosystem;
 
-/// Extract affected versions from ranges and explicit version lists
+/// Extract affected versions from OSV entry.
+///
+/// # Current Behavior
+///
+/// Only explicit versions are extracted. Semver ranges are intentionally skipped
+/// because expanding them requires querying the package registry for all available
+/// versions, which is not implemented.
+///
+/// See the module-level "Known Limitations" section for details on this limitation
+/// and its security implications.
+///
+/// # Arguments
+///
+/// * `ranges` - Semver ranges (currently ignored)
+/// * `explicit_versions` - Explicit version strings
 fn extract_affected_versions(ranges: &[Range], explicit_versions: &[String]) -> Vec<String> {
-    let mut versions = Vec::new();
+    // Only explicit versions are supported; ranges require registry queries to expand
+    let _ = ranges; // Explicitly acknowledge that ranges are not processed
 
-    // Add explicit versions
-    versions.extend(explicit_versions.iter().cloned());
-
-    // For SEMVER ranges, we can't enumerate all versions without a registry lookup
-    // In a real implementation, this would query the registry for all versions
-    // and filter based on the range. For now, we only use explicit versions.
-
-    // TODO: Implement semver range matching against registry version list
-    for _range in ranges {
-        // Range matching would go here
-    }
-
-    versions
+    explicit_versions.to_vec()
 }
 
 // ============================================================================

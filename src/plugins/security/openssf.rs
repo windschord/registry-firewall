@@ -58,6 +58,8 @@ pub struct OpenSsfConfig {
     pub git_timeout_secs: u64,
     /// Repository URL (for testing)
     pub repo_url: String,
+    /// Default branch name (default: "main")
+    pub default_branch: String,
 }
 
 impl Default for OpenSsfConfig {
@@ -74,6 +76,7 @@ impl Default for OpenSsfConfig {
             },
             git_timeout_secs: 300,
             repo_url: DEFAULT_REPO_URL.to_string(),
+            default_branch: "main".to_string(),
         }
     }
 }
@@ -205,10 +208,11 @@ impl OpenSsfPlugin {
             return Err(SyncError::Network(format!("Git fetch failed: {}", stderr)));
         }
 
-        // Reset to origin/main
+        // Reset to origin/<branch>
+        let branch_ref = format!("origin/{}", self.config.default_branch);
         let output = Command::new("git")
             .current_dir(repo_path)
-            .args(["reset", "--hard", "origin/main"])
+            .args(["reset", "--hard", &branch_ref])
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .output()
@@ -264,11 +268,11 @@ impl OpenSsfPlugin {
             let eco_records = self.parse_ecosystem_dir(&osv_dir, &normalized_eco).await?;
 
             for (pkg_name, versions) in eco_records {
+                records += versions.len() as u64;
                 new_packages
                     .entry(normalized_eco.clone())
                     .or_default()
                     .insert(pkg_name, versions);
-                records += 1;
             }
         }
 
@@ -489,16 +493,8 @@ impl SecuritySourcePlugin for OpenSsfPlugin {
     }
 }
 
-/// Normalize ecosystem name for consistent comparison
-fn normalize_ecosystem(ecosystem: &str) -> String {
-    match ecosystem.to_lowercase().as_str() {
-        "pypi" => "pypi".to_string(),
-        "go" => "go".to_string(),
-        "crates.io" | "cargo" => "crates.io".to_string(),
-        "npm" => "npm".to_string(),
-        other => other.to_lowercase(),
-    }
-}
+// Use shared normalize_ecosystem from parent module
+use super::normalize_ecosystem;
 
 // ============================================================================
 // OSV JSON Schema Types (reused from OSV plugin)
@@ -543,59 +539,7 @@ struct Package {
 mod tests {
     use super::*;
     use crate::models::SyncStatusValue;
-    use std::io::Write;
     use tempfile::TempDir;
-
-    /// Create a test repository structure with OSV files
-    #[allow(dead_code)]
-    async fn create_test_repo(
-        dir: &TempDir,
-        entries: Vec<(&str, &str, &str)>,
-    ) -> Result<(), std::io::Error> {
-        // Initialize git repo
-        let output = Command::new("git")
-            .current_dir(dir.path())
-            .args(["init"])
-            .output()
-            .await?;
-        assert!(output.status.success());
-
-        // Configure git user
-        Command::new("git")
-            .current_dir(dir.path())
-            .args(["config", "user.email", "test@test.com"])
-            .output()
-            .await?;
-        Command::new("git")
-            .current_dir(dir.path())
-            .args(["config", "user.name", "Test"])
-            .output()
-            .await?;
-
-        // Create OSV directory structure
-        for (ecosystem, filename, content) in entries {
-            let eco_dir = dir.path().join("osv").join(ecosystem);
-            tokio::fs::create_dir_all(&eco_dir).await?;
-
-            let file_path = eco_dir.join(filename);
-            let mut file = std::fs::File::create(&file_path)?;
-            file.write_all(content.as_bytes())?;
-        }
-
-        // Commit
-        Command::new("git")
-            .current_dir(dir.path())
-            .args(["add", "."])
-            .output()
-            .await?;
-        Command::new("git")
-            .current_dir(dir.path())
-            .args(["commit", "-m", "Initial commit"])
-            .output()
-            .await?;
-
-        Ok(())
-    }
 
     /// Create a sample OSV malware entry
     fn sample_malware_entry(

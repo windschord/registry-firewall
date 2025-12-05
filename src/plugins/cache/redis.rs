@@ -99,9 +99,10 @@ impl CachePlugin for RedisCache {
         let mut state = self.state.write().await;
 
         // First check if entry exists and get necessary info
-        let entry_info = state.storage.get(&prefixed_key).map(|e| {
-            (e.meta.is_expired(), e.clone())
-        });
+        let entry_info = state
+            .storage
+            .get(&prefixed_key)
+            .map(|e| (e.meta.is_expired(), e.clone()));
 
         match entry_info {
             Some((is_expired, entry)) => {
@@ -125,13 +126,9 @@ impl CachePlugin for RedisCache {
         let prefixed_key = self.make_key(key);
         let mut state = self.state.write().await;
 
-        state.storage.insert(
-            prefixed_key,
-            CacheEntry {
-                data,
-                meta,
-            },
-        );
+        state
+            .storage
+            .insert(prefixed_key, CacheEntry { data, meta });
 
         Ok(())
     }
@@ -285,7 +282,11 @@ mod tests {
 
         for i in 0..5 {
             let data = Bytes::from(format!("Data {}", i));
-            let meta = CacheMeta::new(data.len() as u64, Duration::from_secs(3600), "text/plain".to_string());
+            let meta = CacheMeta::new(
+                data.len() as u64,
+                Duration::from_secs(3600),
+                "text/plain".to_string(),
+            );
             cache.set(&format!("key{}", i), data, meta).await.unwrap();
         }
 

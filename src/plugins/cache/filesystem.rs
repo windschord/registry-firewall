@@ -235,8 +235,8 @@ impl CachePlugin for FilesystemCache {
             Err(e) => return Err(e.into()),
         };
 
-        let stored_meta: StoredMeta =
-            serde_json::from_str(&meta_content).map_err(|e| CacheError::Serialization(e.to_string()))?;
+        let stored_meta: StoredMeta = serde_json::from_str(&meta_content)
+            .map_err(|e| CacheError::Serialization(e.to_string()))?;
 
         // Check if expired
         if stored_meta.meta.is_expired() {
@@ -273,7 +273,10 @@ impl CachePlugin for FilesystemCache {
             lru_entry.last_accessed = chrono::Utc::now();
         }
 
-        Ok(Some(CacheEntry { data, meta: stored_meta.meta }))
+        Ok(Some(CacheEntry {
+            data,
+            meta: stored_meta.meta,
+        }))
     }
 
     async fn set(&self, key: &str, data: Bytes, meta: CacheMeta) -> Result<(), CacheError> {
@@ -304,8 +307,8 @@ impl CachePlugin for FilesystemCache {
             original_key: key.to_string(),
             meta,
         };
-        let meta_json =
-            serde_json::to_string_pretty(&stored_meta).map_err(|e| CacheError::Serialization(e.to_string()))?;
+        let meta_json = serde_json::to_string_pretty(&stored_meta)
+            .map_err(|e| CacheError::Serialization(e.to_string()))?;
         fs::write(&meta_path, meta_json).await?;
 
         // Update state
@@ -466,7 +469,10 @@ mod tests {
     async fn test_get_nonexistent_key() {
         let (cache, _temp) = create_test_cache().await;
 
-        let result = cache.get("nonexistent").await.expect("Get should not error");
+        let result = cache
+            .get("nonexistent")
+            .await
+            .expect("Get should not error");
         assert!(result.is_none());
     }
 
@@ -557,7 +563,11 @@ mod tests {
 
         for i in 0..5 {
             let data = Bytes::from(format!("Data {}", i));
-            let meta = CacheMeta::new(data.len() as u64, Duration::from_secs(3600), "text/plain".to_string());
+            let meta = CacheMeta::new(
+                data.len() as u64,
+                Duration::from_secs(3600),
+                "text/plain".to_string(),
+            );
             cache.set(&format!("key{}", i), data, meta).await.unwrap();
         }
 
@@ -608,7 +618,11 @@ mod tests {
 
         // Add first entry (50 bytes)
         let data1 = Bytes::from(vec![0u8; 50]);
-        let meta1 = CacheMeta::new(50, Duration::from_secs(3600), "application/octet-stream".to_string());
+        let meta1 = CacheMeta::new(
+            50,
+            Duration::from_secs(3600),
+            "application/octet-stream".to_string(),
+        );
         cache.set("key1", data1, meta1).await.unwrap();
 
         // Small delay to ensure different access times
@@ -616,12 +630,20 @@ mod tests {
 
         // Add second entry (50 bytes) - should still fit
         let data2 = Bytes::from(vec![1u8; 50]);
-        let meta2 = CacheMeta::new(50, Duration::from_secs(3600), "application/octet-stream".to_string());
+        let meta2 = CacheMeta::new(
+            50,
+            Duration::from_secs(3600),
+            "application/octet-stream".to_string(),
+        );
         cache.set("key2", data2, meta2).await.unwrap();
 
         // Add third entry (50 bytes) - should trigger eviction of key1
         let data3 = Bytes::from(vec![2u8; 50]);
-        let meta3 = CacheMeta::new(50, Duration::from_secs(3600), "application/octet-stream".to_string());
+        let meta3 = CacheMeta::new(
+            50,
+            Duration::from_secs(3600),
+            "application/octet-stream".to_string(),
+        );
         cache.set("key3", data3, meta3).await.unwrap();
 
         let stats = cache.stats().await;
@@ -687,9 +709,18 @@ mod tests {
         let meta = CacheMeta::new(4, Duration::from_secs(3600), "text/plain".to_string());
 
         // These keys would all become "path_with_something" with simple replacement
-        cache.set("path/with/slashes", data.clone(), meta.clone()).await.unwrap();
-        cache.set("path:with:colons", data.clone(), meta.clone()).await.unwrap();
-        cache.set("path_with_underscores", data.clone(), meta).await.unwrap();
+        cache
+            .set("path/with/slashes", data.clone(), meta.clone())
+            .await
+            .unwrap();
+        cache
+            .set("path:with:colons", data.clone(), meta.clone())
+            .await
+            .unwrap();
+        cache
+            .set("path_with_underscores", data.clone(), meta)
+            .await
+            .unwrap();
 
         // All should be retrievable independently (no collisions)
         assert!(cache.get("path/with/slashes").await.unwrap().is_some());

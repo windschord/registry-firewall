@@ -85,8 +85,7 @@ impl CacheMeta {
         let now = Utc::now();
         // If TTL conversion fails (e.g., overflow), treat as not expired to avoid
         // unexpected cache misses. Use max duration as fallback.
-        let ttl_chrono = chrono::Duration::from_std(self.ttl)
-            .unwrap_or(chrono::TimeDelta::MAX);
+        let ttl_chrono = chrono::Duration::from_std(self.ttl).unwrap_or(chrono::TimeDelta::MAX);
         let expires_at = self.created_at + ttl_chrono;
         now > expires_at
     }
@@ -167,7 +166,11 @@ mod tests {
     // Test 1: CacheMeta creation
     #[test]
     fn test_cache_meta_new() {
-        let meta = CacheMeta::new(1024, Duration::from_secs(3600), "application/json".to_string());
+        let meta = CacheMeta::new(
+            1024,
+            Duration::from_secs(3600),
+            "application/json".to_string(),
+        );
 
         assert_eq!(meta.size, 1024);
         assert_eq!(meta.ttl, Duration::from_secs(3600));
@@ -256,7 +259,11 @@ mod tests {
     // Test 9: CacheMeta serialization
     #[test]
     fn test_cache_meta_serialization() {
-        let meta = CacheMeta::new(1024, Duration::from_secs(3600), "application/json".to_string());
+        let meta = CacheMeta::new(
+            1024,
+            Duration::from_secs(3600),
+            "application/json".to_string(),
+        );
         let json = serde_json::to_string(&meta).expect("Serialization should succeed");
 
         assert!(json.contains("\"size\":1024"));

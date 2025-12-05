@@ -83,7 +83,11 @@ impl CacheMeta {
     /// Checks if the cache entry has expired
     pub fn is_expired(&self) -> bool {
         let now = Utc::now();
-        let expires_at = self.created_at + chrono::Duration::from_std(self.ttl).unwrap_or_default();
+        // If TTL conversion fails (e.g., overflow), treat as not expired to avoid
+        // unexpected cache misses. Use max duration as fallback.
+        let ttl_chrono = chrono::Duration::from_std(self.ttl)
+            .unwrap_or(chrono::TimeDelta::MAX);
+        let expires_at = self.created_at + ttl_chrono;
         now > expires_at
     }
 }

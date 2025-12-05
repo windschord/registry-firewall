@@ -169,7 +169,8 @@ impl CachePlugin for RedisCache {
         state.storage.retain(|_, entry| !entry.meta.is_expired());
 
         let deleted = initial_count - state.storage.len();
-        state.evictions += deleted as u64;
+        // Note: We don't increment evictions here because expiration is not
+        // the same as eviction (which refers to size-based removal).
 
         Ok(deleted as u64)
     }

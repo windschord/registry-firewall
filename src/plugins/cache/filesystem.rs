@@ -8,7 +8,10 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+use base64::Engine;
 use bytes::Bytes;
+use serde::{Deserialize, Serialize};
 use tokio::fs;
 use tokio::sync::RwLock;
 
@@ -34,6 +37,17 @@ impl Default for FilesystemCacheConfig {
     }
 }
 
+/// Extended metadata stored in .meta.json files
+/// Includes the original key to support recovery during scan
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct StoredMeta {
+    /// The original cache key (for recovery during scan)
+    original_key: String,
+    /// The actual cache metadata
+    #[serde(flatten)]
+    meta: CacheMeta,
+}
+
 /// Metadata about an LRU entry
 #[derive(Debug, Clone)]
 struct LruEntry {
@@ -54,7 +68,7 @@ struct CacheState {
     misses: u64,
     /// Eviction count
     evictions: u64,
-    /// LRU tracking: key -> (size, last_accessed)
+    /// LRU tracking: original_key -> (size, last_accessed)
     lru_map: HashMap<String, LruEntry>,
 }
 
@@ -94,21 +108,22 @@ impl FilesystemCache {
         self.config.max_size_bytes
     }
 
+    /// Encodes a key to a safe filename using URL-safe base64
+    /// This prevents collisions between keys with different special characters
+    fn encode_key(key: &str) -> String {
+        URL_SAFE_NO_PAD.encode(key.as_bytes())
+    }
+
     /// Gets the file path for a cache key
     fn key_to_path(&self, key: &str) -> PathBuf {
-        // Sanitize key to prevent directory traversal
-        let sanitized = key.replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|'], "_");
-        self.config.base_path.join(&sanitized)
+        let encoded = Self::encode_key(key);
+        self.config.base_path.join(&encoded)
     }
 
     /// Gets the metadata file path for a cache key
     fn key_to_meta_path(&self, key: &str) -> PathBuf {
-        let data_path = self.key_to_path(key);
-        let file_name = data_path
-            .file_name()
-            .map(|s| s.to_string_lossy().to_string())
-            .unwrap_or_default();
-        data_path.with_file_name(format!("{}.meta.json", file_name))
+        let encoded = Self::encode_key(key);
+        self.config.base_path.join(format!("{}.meta.json", encoded))
     }
 
     /// Scans existing entries to populate the internal state
@@ -123,26 +138,27 @@ impl FilesystemCache {
 
         while let Some(entry) = entries.next_entry().await? {
             let path = entry.path();
+
+            // Only process .meta.json files to recover original keys
             if path.extension().is_some_and(|ext| ext == "json") {
-                continue; // Skip meta files
-            }
-
-            let file_name = path
-                .file_name()
-                .and_then(|s| s.to_str())
-                .unwrap_or_default()
-                .to_string();
-
-            if let Ok(metadata) = fs::metadata(&path).await {
-                let size = metadata.len();
-                state.total_size += size;
-                state.lru_map.insert(
-                    file_name,
-                    LruEntry {
-                        size,
-                        last_accessed: chrono::Utc::now(),
-                    },
-                );
+                // Read the meta file to get the original key
+                if let Ok(meta_content) = fs::read_to_string(&path).await {
+                    if let Ok(stored_meta) = serde_json::from_str::<StoredMeta>(&meta_content) {
+                        // Get the data file path based on the meta file name
+                        let data_path = path.with_extension("").with_extension("");
+                        if let Ok(file_meta) = fs::metadata(&data_path).await {
+                            let size = file_meta.len();
+                            state.total_size += size;
+                            state.lru_map.insert(
+                                stored_meta.original_key,
+                                LruEntry {
+                                    size,
+                                    last_accessed: chrono::Utc::now(),
+                                },
+                            );
+                        }
+                    }
+                }
             }
         }
 
@@ -151,37 +167,44 @@ impl FilesystemCache {
 
     /// Evicts entries using LRU until enough space is available
     async fn evict_lru(&self, required_space: u64) -> Result<(), CacheError> {
-        let mut state = self.state.write().await;
         let max_size = self.config.max_size_bytes;
 
-        while state.total_size + required_space > max_size && !state.lru_map.is_empty() {
-            // Find the least recently used entry
-            let lru_key = state
-                .lru_map
-                .iter()
-                .min_by_key(|(_, entry)| entry.last_accessed)
-                .map(|(k, _)| k.clone());
+        loop {
+            // Collect eviction targets while holding the lock
+            let eviction_target = {
+                let mut state = self.state.write().await;
 
-            if let Some(key) = lru_key {
-                let entry_size = state.lru_map.get(&key).map(|e| e.size).unwrap_or(0);
+                if state.total_size + required_space <= max_size || state.lru_map.is_empty() {
+                    break;
+                }
 
-                // Remove from LRU map
-                state.lru_map.remove(&key);
-                state.total_size = state.total_size.saturating_sub(entry_size);
-                state.evictions += 1;
+                // Find the least recently used entry
+                let lru_key = state
+                    .lru_map
+                    .iter()
+                    .min_by_key(|(_, entry)| entry.last_accessed)
+                    .map(|(k, _)| k.clone());
 
-                // Delete files (outside of state lock)
+                if let Some(key) = lru_key {
+                    let entry_size = state.lru_map.get(&key).map(|e| e.size).unwrap_or(0);
+
+                    // Remove from LRU map and update stats
+                    state.lru_map.remove(&key);
+                    state.total_size = state.total_size.saturating_sub(entry_size);
+                    state.evictions += 1;
+
+                    Some(key)
+                } else {
+                    None
+                }
+            };
+
+            // Delete files outside of lock
+            if let Some(key) = eviction_target {
                 let data_path = self.key_to_path(&key);
                 let meta_path = self.key_to_meta_path(&key);
-
-                // We need to drop the state lock before doing IO
-                drop(state);
-
                 let _ = fs::remove_file(&data_path).await;
                 let _ = fs::remove_file(&meta_path).await;
-
-                // Re-acquire the lock
-                state = self.state.write().await;
             } else {
                 break;
             }
@@ -212,11 +235,11 @@ impl CachePlugin for FilesystemCache {
             Err(e) => return Err(e.into()),
         };
 
-        let meta: CacheMeta =
+        let stored_meta: StoredMeta =
             serde_json::from_str(&meta_content).map_err(|e| CacheError::Serialization(e.to_string()))?;
 
         // Check if expired
-        if meta.is_expired() {
+        if stored_meta.meta.is_expired() {
             // Clean up expired entry
             let _ = fs::remove_file(&data_path).await;
             let _ = fs::remove_file(&meta_path).await;
@@ -250,7 +273,7 @@ impl CachePlugin for FilesystemCache {
             lru_entry.last_accessed = chrono::Utc::now();
         }
 
-        Ok(Some(CacheEntry { data, meta }))
+        Ok(Some(CacheEntry { data, meta: stored_meta.meta }))
     }
 
     async fn set(&self, key: &str, data: Bytes, meta: CacheMeta) -> Result<(), CacheError> {
@@ -276,9 +299,13 @@ impl CachePlugin for FilesystemCache {
         // Write data file
         fs::write(&data_path, &data).await?;
 
-        // Write metadata file
+        // Write metadata file with original key
+        let stored_meta = StoredMeta {
+            original_key: key.to_string(),
+            meta,
+        };
         let meta_json =
-            serde_json::to_string_pretty(&meta).map_err(|e| CacheError::Serialization(e.to_string()))?;
+            serde_json::to_string_pretty(&stored_meta).map_err(|e| CacheError::Serialization(e.to_string()))?;
         fs::write(&meta_path, meta_json).await?;
 
         // Update state
@@ -305,12 +332,13 @@ impl CachePlugin for FilesystemCache {
         let data_path = self.key_to_path(key);
         let meta_path = self.key_to_meta_path(key);
 
-        // Update state first
-        let mut state = self.state.write().await;
-        if let Some(lru_entry) = state.lru_map.remove(key) {
-            state.total_size = state.total_size.saturating_sub(lru_entry.size);
+        // Update state and delete files atomically (state update first)
+        {
+            let mut state = self.state.write().await;
+            if let Some(lru_entry) = state.lru_map.remove(key) {
+                state.total_size = state.total_size.saturating_sub(lru_entry.size);
+            }
         }
-        drop(state);
 
         // Delete files (ignore errors if files don't exist)
         let _ = fs::remove_file(&data_path).await;
@@ -331,13 +359,14 @@ impl CachePlugin for FilesystemCache {
     }
 
     async fn purge(&self) -> Result<(), CacheError> {
-        let mut state = self.state.write().await;
-
-        // Clear all entries
-        let keys: Vec<String> = state.lru_map.keys().cloned().collect();
-        state.lru_map.clear();
-        state.total_size = 0;
-        drop(state);
+        // Collect keys and clear state atomically
+        let keys: Vec<String> = {
+            let mut state = self.state.write().await;
+            let keys: Vec<String> = state.lru_map.keys().cloned().collect();
+            state.lru_map.clear();
+            state.total_size = 0;
+            keys
+        };
 
         // Delete all files
         for key in keys {
@@ -351,9 +380,11 @@ impl CachePlugin for FilesystemCache {
     }
 
     async fn purge_expired(&self) -> Result<u64, CacheError> {
-        let state = self.state.read().await;
-        let keys: Vec<String> = state.lru_map.keys().cloned().collect();
-        drop(state);
+        // Get keys to check
+        let keys: Vec<String> = {
+            let state = self.state.read().await;
+            state.lru_map.keys().cloned().collect()
+        };
 
         let mut deleted_count = 0u64;
 
@@ -362,10 +393,17 @@ impl CachePlugin for FilesystemCache {
 
             // Read and check metadata
             if let Ok(meta_content) = fs::read_to_string(&meta_path).await {
-                if let Ok(meta) = serde_json::from_str::<CacheMeta>(&meta_content) {
-                    if meta.is_expired() {
-                        self.delete(&key).await?;
-                        deleted_count += 1;
+                if let Ok(stored_meta) = serde_json::from_str::<StoredMeta>(&meta_content) {
+                    if stored_meta.meta.is_expired() {
+                        // Re-verify key still exists before deleting
+                        let should_delete = {
+                            let state = self.state.read().await;
+                            state.lru_map.contains_key(&key)
+                        };
+                        if should_delete {
+                            self.delete(&key).await?;
+                            deleted_count += 1;
+                        }
                     }
                 }
             }
@@ -614,7 +652,7 @@ mod tests {
         assert_eq!(stats.total_size_bytes, 15);
     }
 
-    // Test 13: Meta file is created
+    // Test 13: Meta file is created with original key
     #[tokio::test]
     async fn test_meta_file_created() {
         let (cache, temp_dir) = create_test_cache().await;
@@ -628,32 +666,38 @@ mod tests {
         );
         cache.set("meta_test", data, meta).await.unwrap();
 
-        let meta_path = temp_dir.path().join("meta_test.meta.json");
+        // The meta file uses base64-encoded key
+        let encoded_key = FilesystemCache::encode_key("meta_test");
+        let meta_path = temp_dir.path().join(format!("{}.meta.json", encoded_key));
         assert!(meta_path.exists(), "Meta file should exist");
 
         let content = std::fs::read_to_string(&meta_path).unwrap();
         assert!(content.contains("etag123"));
         assert!(content.contains("text/plain"));
+        assert!(content.contains("meta_test")); // Original key stored
     }
 
-    // Test 14: Key sanitization
+    // Test 14: Key sanitization - no collisions with base64 encoding
     #[tokio::test]
-    async fn test_key_sanitization() {
+    async fn test_key_no_collisions() {
         let (cache, _temp) = create_test_cache().await;
 
-        // Keys with special characters
+        // Keys that would collide with simple sanitization
         let data = Bytes::from("Data");
         let meta = CacheMeta::new(4, Duration::from_secs(3600), "text/plain".to_string());
 
-        // This should not cause issues with file paths
+        // These keys would all become "path_with_something" with simple replacement
         cache.set("path/with/slashes", data.clone(), meta.clone()).await.unwrap();
         cache.set("path:with:colons", data.clone(), meta.clone()).await.unwrap();
-        cache.set("path<with>special", data.clone(), meta).await.unwrap();
+        cache.set("path_with_underscores", data.clone(), meta).await.unwrap();
 
-        // All should be retrievable
+        // All should be retrievable independently (no collisions)
         assert!(cache.get("path/with/slashes").await.unwrap().is_some());
         assert!(cache.get("path:with:colons").await.unwrap().is_some());
-        assert!(cache.get("path<with>special").await.unwrap().is_some());
+        assert!(cache.get("path_with_underscores").await.unwrap().is_some());
+
+        let stats = cache.stats().await;
+        assert_eq!(stats.entries, 3, "All three entries should exist");
     }
 
     // Test 15: Config defaults
@@ -662,5 +706,21 @@ mod tests {
         let config = FilesystemCacheConfig::default();
         assert_eq!(config.base_path, PathBuf::from("/data/cache"));
         assert_eq!(config.max_size_bytes, 50 * 1024 * 1024 * 1024);
+    }
+
+    // Test 16: Base64 encoding produces unique filenames
+    #[test]
+    fn test_key_encoding_uniqueness() {
+        let key1 = "path/with/slashes";
+        let key2 = "path:with:colons";
+        let key3 = "path_with_underscores";
+
+        let encoded1 = FilesystemCache::encode_key(key1);
+        let encoded2 = FilesystemCache::encode_key(key2);
+        let encoded3 = FilesystemCache::encode_key(key3);
+
+        assert_ne!(encoded1, encoded2);
+        assert_ne!(encoded1, encoded3);
+        assert_ne!(encoded2, encoded3);
     }
 }

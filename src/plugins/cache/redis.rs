@@ -3,8 +3,43 @@
 //! This module implements caching using Redis as the backend.
 //! It's suitable for distributed caching in multi-instance deployments.
 //!
-//! Note: This is a placeholder implementation. To enable Redis support,
-//! add the `redis` crate to Cargo.toml and implement the actual Redis operations.
+//! # Current Status: Placeholder Implementation
+//!
+//! This is currently a placeholder that uses in-memory storage to maintain
+//! API compatibility. It should be replaced with actual Redis operations
+//! for production use.
+//!
+//! # Migration to Real Redis
+//!
+//! To enable real Redis support:
+//!
+//! 1. Add the `redis` crate to Cargo.toml:
+//!    ```toml
+//!    redis = { version = "0.25", features = ["tokio-comp", "connection-manager"] }
+//!    ```
+//!
+//! 2. Replace the `CacheState` struct with a Redis connection:
+//!    ```rust,ignore
+//!    use redis::aio::ConnectionManager;
+//!
+//!    pub struct RedisCache {
+//!        config: RedisCacheConfig,
+//!        conn: ConnectionManager,
+//!    }
+//!    ```
+//!
+//! 3. Implement operations using Redis commands:
+//!    - `get`: Use `GET` with `OBJECT IDLETIME` for access tracking
+//!    - `set`: Use `SET` with `EX` option for TTL
+//!    - `delete`: Use `DEL`
+//!    - `purge`: Use `SCAN` + `DEL` with prefix matching
+//!    - `stats`: Use `INFO` and `DBSIZE` commands
+//!
+//! 4. Handle Redis-specific concerns:
+//!    - Connection pooling and reconnection
+//!    - Serialization of CacheMeta (consider MessagePack for efficiency)
+//!    - Atomic operations for statistics (use Redis INCR/DECR)
+//!    - Cluster support if needed
 
 use std::collections::HashMap;
 use std::sync::Arc;

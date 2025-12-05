@@ -81,10 +81,22 @@ impl CacheMeta {
     }
 
     /// Checks if the cache entry has expired
+    ///
+    /// # TTL Overflow Handling
+    ///
+    /// If the TTL duration cannot be converted to a chrono::Duration (e.g., due to
+    /// overflow for extremely large values), this method conservatively treats the
+    /// entry as NOT expired to avoid unexpected cache misses. This is intentional:
+    /// - Cache misses are more costly than keeping an entry slightly longer
+    /// - Extremely large TTLs (causing overflow) indicate intent for long-lived entries
+    /// - The caller can always explicitly delete entries if needed
+    ///
+    /// In practice, TTL overflow only occurs for durations exceeding ~292 billion years,
+    /// which is far beyond any reasonable cache TTL.
     pub fn is_expired(&self) -> bool {
         let now = Utc::now();
-        // If TTL conversion fails (e.g., overflow), treat as not expired to avoid
-        // unexpected cache misses. Use max duration as fallback.
+        // Use TimeDelta::MAX as fallback for overflow cases, treating the entry as
+        // never expired rather than immediately expired.
         let ttl_chrono = chrono::Duration::from_std(self.ttl).unwrap_or(chrono::TimeDelta::MAX);
         let expires_at = self.created_at + ttl_chrono;
         now > expires_at

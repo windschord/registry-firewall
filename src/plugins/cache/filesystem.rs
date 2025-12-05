@@ -127,6 +127,8 @@ impl FilesystemCache {
     }
 
     /// Scans existing entries to populate the internal state
+    ///
+    /// Reads all .meta.json files to recover original keys and populate the LRU map.
     async fn scan_existing_entries(&self) -> Result<(), CacheError> {
         let base_path = &self.config.base_path;
         if !base_path.exists() {
@@ -140,23 +142,32 @@ impl FilesystemCache {
             let path = entry.path();
 
             // Only process .meta.json files to recover original keys
-            if path.extension().is_some_and(|ext| ext == "json") {
-                // Read the meta file to get the original key
-                if let Ok(meta_content) = fs::read_to_string(&path).await {
-                    if let Ok(stored_meta) = serde_json::from_str::<StoredMeta>(&meta_content) {
-                        // Get the data file path based on the meta file name
-                        let data_path = path.with_extension("").with_extension("");
-                        if let Ok(file_meta) = fs::metadata(&data_path).await {
-                            let size = file_meta.len();
-                            state.total_size += size;
-                            state.lru_map.insert(
-                                stored_meta.original_key,
-                                LruEntry {
-                                    size,
-                                    last_accessed: chrono::Utc::now(),
-                                },
-                            );
-                        }
+            let file_name = path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or_default();
+
+            if !file_name.ends_with(".meta.json") {
+                continue;
+            }
+
+            // Read the meta file to get the original key
+            if let Ok(meta_content) = fs::read_to_string(&path).await {
+                if let Ok(stored_meta) = serde_json::from_str::<StoredMeta>(&meta_content) {
+                    // Extract the encoded base name by removing ".meta.json" suffix
+                    let encoded_base = file_name.strip_suffix(".meta.json").unwrap_or(file_name);
+                    let data_path = base_path.join(encoded_base);
+
+                    if let Ok(file_meta) = fs::metadata(&data_path).await {
+                        let size = file_meta.len();
+                        state.total_size += size;
+                        state.lru_map.insert(
+                            stored_meta.original_key,
+                            LruEntry {
+                                size,
+                                last_accessed: chrono::Utc::now(),
+                            },
+                        );
                     }
                 }
             }

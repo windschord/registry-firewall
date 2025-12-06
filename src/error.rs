@@ -167,6 +167,10 @@ pub enum ProxyError {
     /// Cache error
     #[error("Cache error: {0}")]
     Cache(#[from] CacheError),
+
+    /// Filter error
+    #[error("Filter error: {0}")]
+    Filter(#[from] FilterError),
 }
 
 /// Metadata filtering errors

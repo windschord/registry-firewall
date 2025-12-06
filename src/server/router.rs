@@ -252,14 +252,23 @@ async fn api_cache_clear_handler<D: Database + 'static>(
 ) -> impl IntoResponse {
     if let Some(cache) = &state.cache_plugin {
         match cache.purge().await {
-            Ok(_) => Json(serde_json::json!({ "message": "Cache cleared" })),
+            Ok(_) => (
+                StatusCode::OK,
+                Json(serde_json::json!({ "message": "Cache cleared" })),
+            ),
             Err(e) => {
                 tracing::error!(error = %e, "Failed to clear cache");
-                Json(serde_json::json!({ "error": "Failed to clear cache" }))
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(serde_json::json!({ "error": "Failed to clear cache" })),
+                )
             }
         }
     } else {
-        Json(serde_json::json!({ "message": "No cache configured" }))
+        (
+            StatusCode::OK,
+            Json(serde_json::json!({ "message": "No cache configured" })),
+        )
     }
 }
 
@@ -268,10 +277,13 @@ async fn api_list_rules_handler<D: Database + 'static>(
     State(state): State<AppState<D>>,
 ) -> impl IntoResponse {
     match state.database.list_rules().await {
-        Ok(rules) => Json(serde_json::json!({ "rules": rules })),
+        Ok(rules) => (StatusCode::OK, Json(serde_json::json!({ "rules": rules }))),
         Err(e) => {
             tracing::error!(error = %e, "Failed to list rules");
-            Json(serde_json::json!({ "error": "Failed to list rules" }))
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": "Failed to list rules" })),
+            )
         }
     }
 }
@@ -325,10 +337,16 @@ async fn api_update_rule_handler<D: Database + 'static>(
 ) -> impl IntoResponse {
     rule.id = Some(id);
     match state.database.update_rule(&rule).await {
-        Ok(_) => Json(serde_json::json!({ "message": "Rule updated" })),
+        Ok(_) => (
+            StatusCode::OK,
+            Json(serde_json::json!({ "message": "Rule updated" })),
+        ),
         Err(e) => {
             tracing::error!(error = %e, rule_id = id, "Failed to update rule");
-            Json(serde_json::json!({ "error": "Failed to update rule" }))
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": "Failed to update rule" })),
+            )
         }
     }
 }
@@ -339,10 +357,16 @@ async fn api_delete_rule_handler<D: Database + 'static>(
     Path(id): Path<i64>,
 ) -> impl IntoResponse {
     match state.database.delete_rule(id).await {
-        Ok(_) => Json(serde_json::json!({ "message": "Rule deleted" })),
+        Ok(_) => (
+            StatusCode::OK,
+            Json(serde_json::json!({ "message": "Rule deleted" })),
+        ),
         Err(e) => {
             tracing::error!(error = %e, rule_id = id, "Failed to delete rule");
-            Json(serde_json::json!({ "error": "Failed to delete rule" }))
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": "Failed to delete rule" })),
+            )
         }
     }
 }
@@ -367,11 +391,17 @@ async fn api_list_tokens_handler<D: Database + 'static>(
                     })
                 })
                 .collect();
-            Json(serde_json::json!({ "tokens": safe_tokens }))
+            (
+                StatusCode::OK,
+                Json(serde_json::json!({ "tokens": safe_tokens })),
+            )
         }
         Err(e) => {
             tracing::error!(error = %e, "Failed to list tokens");
-            Json(serde_json::json!({ "error": "Failed to list tokens" }))
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": "Failed to list tokens" })),
+            )
         }
     }
 }
@@ -425,10 +455,16 @@ async fn api_delete_token_handler<D: Database + 'static>(
     Path(id): Path<String>,
 ) -> impl IntoResponse {
     match state.auth_manager.revoke_token(&id).await {
-        Ok(_) => Json(serde_json::json!({ "message": "Token revoked" })),
+        Ok(_) => (
+            StatusCode::OK,
+            Json(serde_json::json!({ "message": "Token revoked" })),
+        ),
         Err(e) => {
             tracing::error!(error = %e, token_id = %id, "Failed to revoke token");
-            Json(serde_json::json!({ "error": "Failed to revoke token" }))
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": "Failed to revoke token" })),
+            )
         }
     }
 }

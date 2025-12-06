@@ -185,10 +185,12 @@ impl IntoResponse for AuthResponse {
         let body = serde_json::json!({
             "error": self.message
         });
+        let body_str = serde_json::to_string(&body)
+            .unwrap_or_else(|_| r#"{"error":"Internal server error"}"#.to_string());
         (
             self.status,
             [(header::CONTENT_TYPE, "application/json")],
-            serde_json::to_string(&body).unwrap(),
+            body_str,
         )
             .into_response()
     }

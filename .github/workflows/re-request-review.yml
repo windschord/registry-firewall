@@ -1,0 +1,40 @@
+name: Re-request Review
+
+on:
+  pull_request:
+    types: [synchronize]  # PRにpushされたとき
+
+jobs:
+  re-request-review:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Re-request review from non-approved reviewers
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          # 各レビュアーの最新レビューを取得し、APPROVED 以外のユーザーを抽出
+          reviewers=$(gh api "repos/${REPO}/pulls/${PR_NUMBER}/reviews" \
+            --jq 'group_by(.user.login)
+                  | map(sort_by(.submitted_at) | last)
+                  | .[]
+                  | select(.state != "APPROVED")
+                  | .user.login')
+
+          if [ -z "$reviewers" ]; then
+            echo "No reviewers pending approval"
+          else
+            for reviewer in $reviewers; do
+              echo "Re-requesting review from: $reviewer"
+              gh api "repos/${REPO}/pulls/${PR_NUMBER}/requested_reviewers" \
+                -X POST -f "reviewers[]=${reviewer}" || true
+            done
+          fi
+
+          # Copilot にもレビューを依頼
+          echo "Requesting review from Copilot"
+          gh api "repos/${REPO}/pulls/${PR_NUMBER}/requested_reviewers" \
+            -X POST -f "reviewers[]=copilot" || true

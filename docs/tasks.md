@@ -581,15 +581,15 @@ TDDで`src/plugins/registry/traits.rs`にレジストリプラグインのトレ
 - design.mdの「RegistryPlugin Trait」セクションを参照
 
 **受入基準**:
-- [ ] `RegistryPlugin`トレイトが定義されている
-- [ ] `name()`, `path_prefix()`, `parse_request()`, `handle_request()`, `filter_metadata()`, `cache_key()`メソッドが定義されている
-- [ ] `RequestContext`構造体が定義されている
-- [ ] `ParseError`, `ProxyError`, `FilterError`が定義されている
-- [ ] `cargo test registry::traits`が通過する
+- [x] `RegistryPlugin`トレイトが定義されている
+- [x] `name()`, `path_prefix()`, `parse_request()`, `handle_request()`, `filter_metadata()`, `cache_key()`メソッドが定義されている
+- [x] `RequestContext`構造体が定義されている
+- [x] `ParseError`, `ProxyError`, `FilterError`が定義されている
+- [x] `cargo test registry::traits`が通過する (11 tests)
 
 **依存関係**: タスク2.2
 **推定工数**: 25分
-**ステータス**: `TODO`
+**ステータス**: `DONE`
 
 #### タスク6.2: PyPIプラグインの実装
 **説明**:
@@ -611,17 +611,17 @@ TDDで`src/plugins/registry/pypi.rs`にPyPIプラグインを実装する
 - HTML解析で`<a>`タグをフィルタリング
 
 **受入基準**:
-- [ ] `PyPIPlugin`構造体が定義されている
-- [ ] `RegistryPlugin`トレイトが実装されている
-- [ ] Simple APIのHTMLメタデータをパースできる
-- [ ] ブロック対象バージョンを含む`<a>`タグを除外できる
-- [ ] キャッシュキーが一意に生成される
-- [ ] テストが5つ以上存在する
-- [ ] `cargo test pypi`が通過する
+- [x] `PyPIPlugin`構造体が定義されている
+- [x] `RegistryPlugin`トレイトが実装されている
+- [x] Simple APIのHTMLメタデータをパースできる
+- [x] ブロック対象バージョンを含む`<a>`タグを除外できる
+- [x] キャッシュキーが一意に生成される
+- [x] テストが5つ以上存在する (13 tests)
+- [x] `cargo test pypi`が通過する
 
 **依存関係**: タスク6.1
 **推定工数**: 50分
-**ステータス**: `TODO`
+**ステータス**: `DONE`
 
 #### タスク6.3: Go Moduleプラグインの実装
 **説明**:
@@ -642,16 +642,16 @@ TDDで`src/plugins/registry/golang.rs`にGo Moduleプラグインを実装する
 - Go Module Proxy Protocol準拠
 
 **受入基準**:
-- [ ] `GoModulePlugin`構造体が定義されている
-- [ ] `RegistryPlugin`トレイトが実装されている
-- [ ] モジュールパスのエスケープ処理が実装されている
-- [ ] `/@v/list`のバージョン一覧をフィルタリングできる
-- [ ] テストが5つ以上存在する
-- [ ] `cargo test golang`が通過する
+- [x] `GoModulePlugin`構造体が定義されている
+- [x] `RegistryPlugin`トレイトが実装されている
+- [x] モジュールパスのエスケープ処理が実装されている
+- [x] `/@v/list`のバージョン一覧をフィルタリングできる
+- [x] テストが5つ以上存在する (14 tests)
+- [x] `cargo test golang`が通過する
 
 **依存関係**: タスク6.1
 **推定工数**: 50分
-**ステータス**: `TODO`
+**ステータス**: `DONE`
 
 #### タスク6.4: Cargoプラグインの実装
 **説明**:
@@ -671,16 +671,16 @@ TDDで`src/plugins/registry/cargo.rs`にCargoプラグインを実装する
 - Sparse Index形式（JSON Lines）
 
 **受入基準**:
-- [ ] `CargoPlugin`構造体が定義されている
-- [ ] `RegistryPlugin`トレイトが実装されている
-- [ ] クレート名のプレフィックスディレクトリ計算が実装されている
-- [ ] JSON Linesからブロック対象バージョンを除外できる
-- [ ] テストが4つ以上存在する
-- [ ] `cargo test cargo_plugin`が通過する
+- [x] `CargoPlugin`構造体が定義されている
+- [x] `RegistryPlugin`トレイトが実装されている
+- [x] クレート名のプレフィックスディレクトリ計算が実装されている
+- [x] JSON Linesからブロック対象バージョンを除外できる
+- [x] テストが4つ以上存在する (15 tests)
+- [x] `cargo test cargo`が通過する
 
 **依存関係**: タスク6.1
 **推定工数**: 45分
-**ステータス**: `TODO`
+**ステータス**: `DONE`
 
 #### タスク6.5: Dockerプラグインの実装
 **説明**:
@@ -701,18 +701,18 @@ TDDで`src/plugins/registry/docker.rs`にDockerプラグインを実装する
 - Docker Hub認証トークンの中継
 
 **受入基準**:
-- [ ] `DockerPlugin`構造体が定義されている
-- [ ] `RegistryPlugin`トレイトが実装されている
-- [ ] `/v2/{name}/manifests/{reference}`がハンドルできる
-- [ ] `/v2/{name}/blobs/{digest}`がハンドルできる
-- [ ] `/v2/{name}/tags/list`がハンドルできる
-- [ ] 認証トークンの中継が実装されている
-- [ ] テストが4つ以上存在する
-- [ ] `cargo test docker`が通過する
+- [x] `DockerPlugin`構造体が定義されている
+- [x] `RegistryPlugin`トレイトが実装されている
+- [x] `/v2/{name}/manifests/{reference}`がハンドルできる
+- [x] `/v2/{name}/blobs/{digest}`がハンドルできる
+- [x] `/v2/{name}/tags/list`がハンドルできる
+- [x] 認証トークンの中継が実装されている
+- [x] テストが4つ以上存在する (17 tests)
+- [x] `cargo test docker`が通過する
 
 **依存関係**: タスク6.1
 **推定工数**: 50分
-**ステータス**: `TODO`
+**ステータス**: `DONE`
 
 ---
 

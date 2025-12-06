@@ -255,8 +255,12 @@ impl Default for TracingLayer {
 
 /// Tracing middleware function
 ///
-/// Creates OpenTelemetry spans for requests
+/// Creates OpenTelemetry spans for requests.
+/// Uses the Instrument trait to properly span the entire request lifecycle,
+/// including async operations.
 pub async fn tracing_middleware(request: Request, next: Next) -> Response {
+    use tracing::Instrument;
+
     let method = request.method().clone();
     let uri = request.uri().clone();
 
@@ -268,14 +272,17 @@ pub async fn tracing_middleware(request: Request, next: Next) -> Response {
         http.status_code = tracing::field::Empty,
     );
 
-    let _guard = span.enter();
+    // Use instrument to properly cover the entire request lifecycle
+    async move {
+        let response = next.run(request).await;
 
-    let response = next.run(request).await;
+        // Record status code within the span
+        tracing::Span::current().record("http.status_code", response.status().as_u16());
 
-    // Record status code
-    tracing::Span::current().record("http.status_code", response.status().as_u16());
-
-    response
+        response
+    }
+    .instrument(span)
+    .await
 }
 
 #[cfg(test)]

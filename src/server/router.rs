@@ -145,18 +145,19 @@ async fn metrics_handler() -> impl IntoResponse {
 /// Generic registry proxy handler
 async fn registry_proxy_handler<D: Database + 'static>(
     State(_state): State<AppState<D>>,
-    Path(path): Path<String>,
+    Path(_path): Path<String>,
     req: axum::http::Request<axum::body::Body>,
 ) -> impl IntoResponse {
     // Get the full path from the request
     let full_path = req.uri().path();
 
     // Find the matching registry plugin
-    // The proxy handler implementation will be in Task 8.4
+    // The proxy handler implementation will be completed in a future phase
     // For now, return a placeholder response
+    tracing::debug!(path = %full_path, "Registry proxy request received");
     (
         StatusCode::NOT_IMPLEMENTED,
-        format!("Registry proxy for path: {} ({})", full_path, path),
+        "Registry proxy not yet implemented".to_string(),
     )
 }
 
@@ -252,7 +253,10 @@ async fn api_cache_clear_handler<D: Database + 'static>(
     if let Some(cache) = &state.cache_plugin {
         match cache.purge().await {
             Ok(_) => Json(serde_json::json!({ "message": "Cache cleared" })),
-            Err(e) => Json(serde_json::json!({ "error": format!("Failed to clear cache: {}", e) })),
+            Err(e) => {
+                tracing::error!(error = %e, "Failed to clear cache");
+                Json(serde_json::json!({ "error": "Failed to clear cache" }))
+            }
         }
     } else {
         Json(serde_json::json!({ "message": "No cache configured" }))
@@ -265,7 +269,10 @@ async fn api_list_rules_handler<D: Database + 'static>(
 ) -> impl IntoResponse {
     match state.database.list_rules().await {
         Ok(rules) => Json(serde_json::json!({ "rules": rules })),
-        Err(e) => Json(serde_json::json!({ "error": format!("Failed to list rules: {}", e) })),
+        Err(e) => {
+            tracing::error!(error = %e, "Failed to list rules");
+            Json(serde_json::json!({ "error": "Failed to list rules" }))
+        }
     }
 }
 
@@ -279,10 +286,13 @@ async fn api_create_rule_handler<D: Database + 'static>(
             StatusCode::CREATED,
             Json(serde_json::json!({ "id": id, "message": "Rule created" })),
         ),
-        Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({ "error": format!("Failed to create rule: {}", e) })),
-        ),
+        Err(e) => {
+            tracing::error!(error = %e, "Failed to create rule");
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": "Failed to create rule" })),
+            )
+        }
     }
 }
 
@@ -297,10 +307,13 @@ async fn api_get_rule_handler<D: Database + 'static>(
             StatusCode::NOT_FOUND,
             Json(serde_json::json!({ "error": "Rule not found" })),
         ),
-        Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({ "error": format!("Failed to get rule: {}", e) })),
-        ),
+        Err(e) => {
+            tracing::error!(error = %e, rule_id = id, "Failed to get rule");
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": "Failed to get rule" })),
+            )
+        }
     }
 }
 
@@ -313,7 +326,10 @@ async fn api_update_rule_handler<D: Database + 'static>(
     rule.id = Some(id);
     match state.database.update_rule(&rule).await {
         Ok(_) => Json(serde_json::json!({ "message": "Rule updated" })),
-        Err(e) => Json(serde_json::json!({ "error": format!("Failed to update rule: {}", e) })),
+        Err(e) => {
+            tracing::error!(error = %e, rule_id = id, "Failed to update rule");
+            Json(serde_json::json!({ "error": "Failed to update rule" }))
+        }
     }
 }
 
@@ -324,7 +340,10 @@ async fn api_delete_rule_handler<D: Database + 'static>(
 ) -> impl IntoResponse {
     match state.database.delete_rule(id).await {
         Ok(_) => Json(serde_json::json!({ "message": "Rule deleted" })),
-        Err(e) => Json(serde_json::json!({ "error": format!("Failed to delete rule: {}", e) })),
+        Err(e) => {
+            tracing::error!(error = %e, rule_id = id, "Failed to delete rule");
+            Json(serde_json::json!({ "error": "Failed to delete rule" }))
+        }
     }
 }
 
@@ -350,7 +369,10 @@ async fn api_list_tokens_handler<D: Database + 'static>(
                 .collect();
             Json(serde_json::json!({ "tokens": safe_tokens }))
         }
-        Err(e) => Json(serde_json::json!({ "error": format!("Failed to list tokens: {}", e) })),
+        Err(e) => {
+            tracing::error!(error = %e, "Failed to list tokens");
+            Json(serde_json::json!({ "error": "Failed to list tokens" }))
+        }
     }
 }
 
@@ -387,10 +409,13 @@ async fn api_create_token_handler<D: Database + 'static>(
                 "expires_at": response.expires_at
             })),
         ),
-        Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({ "error": format!("Failed to create token: {}", e) })),
-        ),
+        Err(e) => {
+            tracing::error!(error = %e, "Failed to create token");
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": "Failed to create token" })),
+            )
+        }
     }
 }
 
@@ -401,7 +426,10 @@ async fn api_delete_token_handler<D: Database + 'static>(
 ) -> impl IntoResponse {
     match state.auth_manager.revoke_token(&id).await {
         Ok(_) => Json(serde_json::json!({ "message": "Token revoked" })),
-        Err(e) => Json(serde_json::json!({ "error": format!("Failed to revoke token: {}", e) })),
+        Err(e) => {
+            tracing::error!(error = %e, token_id = %id, "Failed to revoke token");
+            Json(serde_json::json!({ "error": "Failed to revoke token" }))
+        }
     }
 }
 

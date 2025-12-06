@@ -121,6 +121,14 @@ impl RedisCache {
     fn make_key(&self, key: &str) -> String {
         format!("{}{}", self.config.prefix, key)
     }
+
+    /// Validates that a cache key is valid (non-empty)
+    fn validate_key(key: &str) -> Result<(), CacheError> {
+        if key.is_empty() {
+            return Err(CacheError::InvalidKey("key cannot be empty".to_string()));
+        }
+        Ok(())
+    }
 }
 
 #[async_trait]
@@ -130,6 +138,8 @@ impl CachePlugin for RedisCache {
     }
 
     async fn get(&self, key: &str) -> Result<Option<CacheEntry>, CacheError> {
+        Self::validate_key(key)?;
+
         let prefixed_key = self.make_key(key);
         let mut state = self.state.write().await;
 
@@ -158,6 +168,8 @@ impl CachePlugin for RedisCache {
     }
 
     async fn set(&self, key: &str, data: Bytes, meta: CacheMeta) -> Result<(), CacheError> {
+        Self::validate_key(key)?;
+
         let prefixed_key = self.make_key(key);
         let mut state = self.state.write().await;
 
@@ -169,6 +181,8 @@ impl CachePlugin for RedisCache {
     }
 
     async fn delete(&self, key: &str) -> Result<(), CacheError> {
+        Self::validate_key(key)?;
+
         let prefixed_key = self.make_key(key);
         let mut state = self.state.write().await;
         state.storage.remove(&prefixed_key);
@@ -380,5 +394,26 @@ mod tests {
         let cache = RedisCache::new(config);
 
         assert_eq!(cache.url(), "redis://custom:6379");
+    }
+
+    // Test 12: Empty key validation
+    #[tokio::test]
+    async fn test_empty_key_rejected() {
+        let cache = create_test_cache();
+
+        let data = Bytes::from("Data");
+        let meta = CacheMeta::new(4, Duration::from_secs(3600), "text/plain".to_string());
+
+        // get with empty key should fail
+        let result = cache.get("").await;
+        assert!(result.is_err());
+
+        // set with empty key should fail
+        let result = cache.set("", data.clone(), meta.clone()).await;
+        assert!(result.is_err());
+
+        // delete with empty key should fail
+        let result = cache.delete("").await;
+        assert!(result.is_err());
     }
 }

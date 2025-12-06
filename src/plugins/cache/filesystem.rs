@@ -114,6 +114,14 @@ impl FilesystemCache {
         URL_SAFE_NO_PAD.encode(key.as_bytes())
     }
 
+    /// Validates that a cache key is valid (non-empty)
+    fn validate_key(key: &str) -> Result<(), CacheError> {
+        if key.is_empty() {
+            return Err(CacheError::InvalidKey("key cannot be empty".to_string()));
+        }
+        Ok(())
+    }
+
     /// Gets the file path for a cache key
     fn key_to_path(&self, key: &str) -> PathBuf {
         let encoded = Self::encode_key(key);
@@ -232,6 +240,8 @@ impl CachePlugin for FilesystemCache {
     }
 
     async fn get(&self, key: &str) -> Result<Option<CacheEntry>, CacheError> {
+        Self::validate_key(key)?;
+
         let data_path = self.key_to_path(key);
         let meta_path = self.key_to_meta_path(key);
 
@@ -291,6 +301,8 @@ impl CachePlugin for FilesystemCache {
     }
 
     async fn set(&self, key: &str, data: Bytes, meta: CacheMeta) -> Result<(), CacheError> {
+        Self::validate_key(key)?;
+
         let data_len = data.len() as u64;
 
         // Check if we need to evict entries
@@ -343,6 +355,8 @@ impl CachePlugin for FilesystemCache {
     }
 
     async fn delete(&self, key: &str) -> Result<(), CacheError> {
+        Self::validate_key(key)?;
+
         let data_path = self.key_to_path(key);
         let meta_path = self.key_to_meta_path(key);
 
@@ -764,5 +778,26 @@ mod tests {
         assert_ne!(encoded1, encoded2);
         assert_ne!(encoded1, encoded3);
         assert_ne!(encoded2, encoded3);
+    }
+
+    // Test 17: Empty key validation
+    #[tokio::test]
+    async fn test_empty_key_rejected() {
+        let (cache, _temp) = create_test_cache().await;
+
+        let data = Bytes::from("Data");
+        let meta = CacheMeta::new(4, Duration::from_secs(3600), "text/plain".to_string());
+
+        // get with empty key should fail
+        let result = cache.get("").await;
+        assert!(result.is_err());
+
+        // set with empty key should fail
+        let result = cache.set("", data.clone(), meta.clone()).await;
+        assert!(result.is_err());
+
+        // delete with empty key should fail
+        let result = cache.delete("").await;
+        assert!(result.is_err());
     }
 }

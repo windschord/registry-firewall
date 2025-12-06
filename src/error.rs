@@ -63,6 +63,10 @@ pub enum CacheError {
     /// Cache entry expired
     #[error("Cache entry expired")]
     Expired,
+
+    /// Invalid cache key (empty or contains invalid characters)
+    #[error("Invalid cache key: {0}")]
+    InvalidKey(String),
 }
 
 /// Database-related errors
@@ -484,6 +488,10 @@ mod tests {
         );
         assert_eq!(CacheError::Expired.to_string(), "Cache entry expired");
         assert_eq!(CacheError::NotFound.to_string(), "Cache entry not found");
+        assert_eq!(
+            CacheError::InvalidKey("key cannot be empty".to_string()).to_string(),
+            "Invalid cache key: key cannot be empty"
+        );
     }
 
     // Test 16: AppError Config and Internal variants

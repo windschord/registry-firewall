@@ -339,6 +339,7 @@ mod tests {
     use super::*;
     use crate::models::package::RequestType;
 
+    // Test 1: Plugin name, ecosystem, and path prefix
     #[test]
     fn test_pypi_plugin_name() {
         let plugin = PyPIPlugin::new();
@@ -347,6 +348,7 @@ mod tests {
         assert_eq!(plugin.path_prefix(), "/pypi");
     }
 
+    // Test 2: PEP 503 package name normalization
     #[test]
     fn test_normalize_package_name() {
         assert_eq!(PyPIPlugin::normalize_package_name("Requests"), "requests");
@@ -364,6 +366,7 @@ mod tests {
         );
     }
 
+    // Test 3: Parse Simple API metadata request
     #[test]
     fn test_parse_simple_api_request() {
         let plugin = PyPIPlugin::new();
@@ -382,6 +385,7 @@ mod tests {
         assert_eq!(req.name, "flask-restful");
     }
 
+    // Test 4: Parse package download request with version extraction
     #[test]
     fn test_parse_packages_request() {
         let plugin = PyPIPlugin::new();
@@ -397,6 +401,7 @@ mod tests {
         assert!(req.is_download());
     }
 
+    // Test 5: Parse wheel filename format
     #[test]
     fn test_parse_wheel_filename() {
         let result = PyPIPlugin::parse_package_filename("requests-2.31.0-py3-none-any.whl");
@@ -406,6 +411,7 @@ mod tests {
         assert_eq!(ver, "2.31.0");
     }
 
+    // Test 6: Parse tarball filename format
     #[test]
     fn test_parse_tarball_filename() {
         let result = PyPIPlugin::parse_package_filename("requests-2.31.0.tar.gz");
@@ -415,6 +421,7 @@ mod tests {
         assert_eq!(ver, "2.31.0");
     }
 
+    // Test 7: Invalid path returns error
     #[test]
     fn test_parse_invalid_path() {
         let plugin = PyPIPlugin::new();
@@ -423,6 +430,7 @@ mod tests {
         assert!(err.is_err());
     }
 
+    // Test 8: HTML filtering removes blocked version links
     #[test]
     fn test_filter_html_removes_blocked_versions() {
         let plugin = PyPIPlugin::new();
@@ -445,6 +453,7 @@ mod tests {
         assert!(filtered.contains("2.32.0"));
     }
 
+    // Test 9: filter_metadata trait method implementation
     #[test]
     fn test_filter_metadata() {
         let plugin = PyPIPlugin::new();
@@ -459,6 +468,7 @@ mod tests {
         assert!(!filtered.contains("1.0.1"));
     }
 
+    // Test 10: Cache key generation with normalization
     #[test]
     fn test_cache_key_generation() {
         let plugin = PyPIPlugin::new();
@@ -473,6 +483,7 @@ mod tests {
         );
     }
 
+    // Test 11: Default configuration values
     #[test]
     fn test_config_defaults() {
         let config = PyPIConfig::default();
@@ -481,6 +492,7 @@ mod tests {
         assert_eq!(config.cache_ttl_secs, 86400);
     }
 
+    // Test 12: Custom configuration support
     #[test]
     fn test_custom_config() {
         let config = PyPIConfig {
@@ -494,6 +506,7 @@ mod tests {
         assert_eq!(plugin.path_prefix(), "/custom-pypi");
     }
 
+    // Test 13: RegistryResponse::blocked creates 403 response
     #[test]
     fn test_registry_response_blocked() {
         let resp = RegistryResponse::blocked("malware detected");

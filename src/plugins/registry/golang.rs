@@ -315,6 +315,7 @@ impl RegistryPlugin for GoModulePlugin {
 mod tests {
     use super::*;
 
+    // Test 1: Plugin name, ecosystem, and path prefix
     #[test]
     fn test_go_plugin_name() {
         let plugin = GoModulePlugin::new();
@@ -323,6 +324,7 @@ mod tests {
         assert_eq!(plugin.path_prefix(), "/go");
     }
 
+    // Test 2: Module path escaping for uppercase letters
     #[test]
     fn test_escape_module_path() {
         assert_eq!(
@@ -339,6 +341,7 @@ mod tests {
         );
     }
 
+    // Test 3: Module path unescaping back to original case
     #[test]
     fn test_unescape_module_path() {
         assert_eq!(
@@ -351,6 +354,7 @@ mod tests {
         );
     }
 
+    // Test 4: Parse @v/list version list request
     #[test]
     fn test_parse_list_request() {
         let plugin = GoModulePlugin::new();
@@ -364,6 +368,7 @@ mod tests {
         assert_eq!(req.request_type, RequestType::Metadata);
     }
 
+    // Test 5: Parse .info version info request
     #[test]
     fn test_parse_info_request() {
         let plugin = GoModulePlugin::new();
@@ -377,6 +382,7 @@ mod tests {
         assert_eq!(req.request_type, RequestType::Download);
     }
 
+    // Test 6: Parse .mod go.mod file request
     #[test]
     fn test_parse_mod_request() {
         let plugin = GoModulePlugin::new();
@@ -388,6 +394,7 @@ mod tests {
         assert_eq!(req.version, Some("v1.9.1".to_string()));
     }
 
+    // Test 7: Parse .zip module archive request
     #[test]
     fn test_parse_zip_request() {
         let plugin = GoModulePlugin::new();
@@ -399,6 +406,7 @@ mod tests {
         assert_eq!(req.version, Some("v1.9.1".to_string()));
     }
 
+    // Test 8: Parse @latest request for latest version
     #[test]
     fn test_parse_latest_request() {
         let plugin = GoModulePlugin::new();
@@ -411,6 +419,7 @@ mod tests {
         assert_eq!(req.request_type, RequestType::Metadata);
     }
 
+    // Test 9: Parse escaped module path with uppercase
     #[test]
     fn test_parse_escaped_path() {
         let plugin = GoModulePlugin::new();
@@ -421,6 +430,7 @@ mod tests {
         assert_eq!(req.name, "github.com/Azure/azure-sdk");
     }
 
+    // Test 10: Invalid path without @v returns error
     #[test]
     fn test_parse_invalid_path() {
         let plugin = GoModulePlugin::new();
@@ -428,6 +438,7 @@ mod tests {
         assert!(err.is_err());
     }
 
+    // Test 11: Filter version list removes blocked versions
     #[test]
     fn test_filter_version_list() {
         let plugin = GoModulePlugin::new();
@@ -446,6 +457,7 @@ mod tests {
         assert!(!filtered.contains("v1.3.0"));
     }
 
+    // Test 12: filter_metadata trait method implementation
     #[test]
     fn test_filter_metadata() {
         let plugin = GoModulePlugin::new();
@@ -460,6 +472,7 @@ mod tests {
         assert!(filtered.contains("v1.2.0"));
     }
 
+    // Test 13: Cache key generation format
     #[test]
     fn test_cache_key_generation() {
         let plugin = GoModulePlugin::new();
@@ -474,6 +487,7 @@ mod tests {
         );
     }
 
+    // Test 14: Default configuration values
     #[test]
     fn test_config_defaults() {
         let config = GoModuleConfig::default();

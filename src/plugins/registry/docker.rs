@@ -384,6 +384,7 @@ impl RegistryPlugin for DockerPlugin {
 mod tests {
     use super::*;
 
+    // Test 1: Plugin name, ecosystem, and path prefix
     #[test]
     fn test_docker_plugin_name() {
         let plugin = DockerPlugin::new();
@@ -392,6 +393,7 @@ mod tests {
         assert_eq!(plugin.path_prefix(), "/v2");
     }
 
+    // Test 2: Image name normalization adds library/ prefix
     #[test]
     fn test_normalize_image_name() {
         assert_eq!(DockerPlugin::normalize_image_name("nginx"), "library/nginx");
@@ -405,6 +407,7 @@ mod tests {
         );
     }
 
+    // Test 3: Parse API version check request (/v2/)
     #[test]
     fn test_parse_version_check() {
         let plugin = DockerPlugin::new();
@@ -415,6 +418,7 @@ mod tests {
         assert_eq!(req.request_type, RequestType::Metadata);
     }
 
+    // Test 4: Parse manifest request by tag
     #[test]
     fn test_parse_manifest_request() {
         let plugin = DockerPlugin::new();
@@ -428,6 +432,7 @@ mod tests {
         assert_eq!(req.request_type, RequestType::Manifest);
     }
 
+    // Test 5: Parse manifest request by digest
     #[test]
     fn test_parse_manifest_by_digest() {
         let plugin = DockerPlugin::new();
@@ -439,6 +444,7 @@ mod tests {
         assert_eq!(req.version, Some("sha256:abc123".to_string()));
     }
 
+    // Test 6: Parse blob download request
     #[test]
     fn test_parse_blob_request() {
         let plugin = DockerPlugin::new();
@@ -451,6 +457,7 @@ mod tests {
         assert_eq!(req.request_type, RequestType::Blob);
     }
 
+    // Test 7: Parse tags list request
     #[test]
     fn test_parse_tags_list() {
         let plugin = DockerPlugin::new();
@@ -463,6 +470,7 @@ mod tests {
         assert_eq!(req.request_type, RequestType::TagList);
     }
 
+    // Test 8: Parse catalog request
     #[test]
     fn test_parse_catalog() {
         let plugin = DockerPlugin::new();
@@ -472,6 +480,7 @@ mod tests {
         assert_eq!(req.request_type, RequestType::Metadata);
     }
 
+    // Test 9: Short image names normalized to library/
     #[test]
     fn test_parse_short_image_name() {
         let plugin = DockerPlugin::new();
@@ -483,6 +492,7 @@ mod tests {
         assert_eq!(req.name, "library/nginx");
     }
 
+    // Test 10: Invalid path returns error
     #[test]
     fn test_parse_invalid_path() {
         let plugin = DockerPlugin::new();
@@ -490,6 +500,7 @@ mod tests {
         assert!(err.is_err());
     }
 
+    // Test 11: Tag vs digest detection
     #[test]
     fn test_is_tag() {
         assert!(DockerPlugin::is_tag("latest"));
@@ -497,6 +508,7 @@ mod tests {
         assert!(!DockerPlugin::is_tag("sha256:abc123"));
     }
 
+    // Test 12: Digest parsing from reference
     #[test]
     fn test_parse_digest() {
         assert_eq!(
@@ -506,6 +518,7 @@ mod tests {
         assert_eq!(DockerPlugin::parse_digest("latest"), None);
     }
 
+    // Test 13: Tag list filtering removes blocked versions
     #[test]
     fn test_filter_tag_list() {
         let plugin = DockerPlugin::new();
@@ -529,6 +542,7 @@ mod tests {
         assert!(filtered.tags.contains(&"latest".to_string()));
     }
 
+    // Test 14: filter_metadata trait method implementation
     #[test]
     fn test_filter_metadata() {
         let plugin = DockerPlugin::new();
@@ -546,6 +560,7 @@ mod tests {
         assert!(!filtered.tags.contains(&"1.1".to_string()));
     }
 
+    // Test 15: Cache key generation with normalization
     #[test]
     fn test_cache_key_generation() {
         let plugin = DockerPlugin::new();
@@ -560,6 +575,7 @@ mod tests {
         );
     }
 
+    // Test 16: Default configuration values
     #[test]
     fn test_config_defaults() {
         let config = DockerConfig::default();
@@ -568,6 +584,7 @@ mod tests {
         assert_eq!(config.path_prefix, "/v2");
     }
 
+    // Test 17: TagList JSON serialization roundtrip
     #[test]
     fn test_tag_list_serialization() {
         let tag_list = TagList {

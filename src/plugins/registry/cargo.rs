@@ -419,6 +419,7 @@ impl RegistryPlugin for CargoPlugin {
 mod tests {
     use super::*;
 
+    // Test 1: Plugin name, ecosystem, and path prefix
     #[test]
     fn test_cargo_plugin_name() {
         let plugin = CargoPlugin::new();
@@ -427,21 +428,25 @@ mod tests {
         assert_eq!(plugin.path_prefix(), "/cargo");
     }
 
+    // Test 2: Index prefix for 1-character crate names
     #[test]
     fn test_index_prefix_1_char() {
         assert_eq!(CargoPlugin::index_prefix("a"), "1/a");
     }
 
+    // Test 3: Index prefix for 2-character crate names
     #[test]
     fn test_index_prefix_2_chars() {
         assert_eq!(CargoPlugin::index_prefix("ab"), "2/ab");
     }
 
+    // Test 4: Index prefix for 3-character crate names
     #[test]
     fn test_index_prefix_3_chars() {
         assert_eq!(CargoPlugin::index_prefix("abc"), "3/a/abc");
     }
 
+    // Test 5: Index prefix for 4+ character crate names
     #[test]
     fn test_index_prefix_4_plus_chars() {
         assert_eq!(CargoPlugin::index_prefix("serde"), "se/rd/serde");
@@ -449,6 +454,7 @@ mod tests {
         assert_eq!(CargoPlugin::index_prefix("SERDE"), "se/rd/serde");
     }
 
+    // Test 6: Parse sparse index metadata request
     #[test]
     fn test_parse_index_request() {
         let plugin = CargoPlugin::new();
@@ -460,6 +466,7 @@ mod tests {
         assert_eq!(req.request_type, RequestType::Metadata);
     }
 
+    // Test 7: Parse crate download request with version
     #[test]
     fn test_parse_download_request() {
         let plugin = CargoPlugin::new();
@@ -473,6 +480,7 @@ mod tests {
         assert_eq!(req.request_type, RequestType::Download);
     }
 
+    // Test 8: Parse .crate file download request
     #[test]
     fn test_parse_crate_file_request() {
         let plugin = CargoPlugin::new();
@@ -484,6 +492,7 @@ mod tests {
         assert_eq!(req.version, Some("1.0.0".to_string()));
     }
 
+    // Test 9: Parse config.json request
     #[test]
     fn test_parse_config_request() {
         let plugin = CargoPlugin::new();
@@ -493,6 +502,7 @@ mod tests {
         assert_eq!(req.request_type, RequestType::Metadata);
     }
 
+    // Test 10: Invalid path returns error
     #[test]
     fn test_parse_invalid_path() {
         let plugin = CargoPlugin::new();
@@ -500,6 +510,7 @@ mod tests {
         assert!(err.is_err());
     }
 
+    // Test 11: JSON Lines filtering removes blocked versions
     #[test]
     fn test_filter_json_lines() {
         let plugin = CargoPlugin::new();
@@ -515,6 +526,7 @@ mod tests {
         assert!(filtered.contains("1.0.2"));
     }
 
+    // Test 12: filter_metadata trait method implementation
     #[test]
     fn test_filter_metadata() {
         let plugin = CargoPlugin::new();
@@ -531,6 +543,7 @@ mod tests {
         assert!(!filtered.contains("1.0.1"));
     }
 
+    // Test 13: Cache key generation with case normalization
     #[test]
     fn test_cache_key_generation() {
         let plugin = CargoPlugin::new();
@@ -542,6 +555,7 @@ mod tests {
         assert_eq!(plugin.cache_key("Serde", None), "cargo:serde:index");
     }
 
+    // Test 14: Default configuration values
     #[test]
     fn test_config_defaults() {
         let config = CargoConfig::default();
@@ -550,6 +564,7 @@ mod tests {
         assert_eq!(config.path_prefix, "/cargo");
     }
 
+    // Test 15: IndexEntry JSON serialization roundtrip
     #[test]
     fn test_index_entry_serialization() {
         let entry = IndexEntry {

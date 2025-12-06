@@ -195,7 +195,7 @@ pub trait RegistryPlugin: Send + Sync {
 mod tests {
     use super::*;
 
-    // Test RequestContext creation and builder pattern
+    // Test 1: RequestContext creation with default values
     #[test]
     fn test_request_context_new() {
         let ctx = RequestContext::new();
@@ -205,6 +205,7 @@ mod tests {
         assert!(ctx.cache_plugin.is_none());
     }
 
+    // Test 2: RequestContext Default trait implementation
     #[test]
     fn test_request_context_default() {
         let ctx = RequestContext::default();
@@ -212,6 +213,7 @@ mod tests {
         assert!(ctx.client_ip.is_none());
     }
 
+    // Test 3: RequestContext builder pattern for setting fields
     #[test]
     fn test_request_context_builder() {
         let ctx = RequestContext::new()
@@ -222,6 +224,7 @@ mod tests {
         assert_eq!(ctx.client_ip, Some("192.168.1.100".to_string()));
     }
 
+    // Test 4: RequestContext Debug trait formatting
     #[test]
     fn test_request_context_debug() {
         let ctx = RequestContext::new()
@@ -233,7 +236,7 @@ mod tests {
         assert!(debug_str.contains("client_ip"));
     }
 
-    // Test RegistryResponse creation
+    // Test 5: RegistryResponse creation with status and body
     #[test]
     fn test_registry_response_new() {
         let resp = RegistryResponse::new(200, "Hello");
@@ -242,6 +245,7 @@ mod tests {
         assert_eq!(resp.content_type, "application/octet-stream");
     }
 
+    // Test 6: RegistryResponse::ok helper for 200 responses
     #[test]
     fn test_registry_response_ok() {
         let resp = RegistryResponse::ok("Success");
@@ -249,12 +253,14 @@ mod tests {
         assert_eq!(resp.body, Bytes::from("Success"));
     }
 
+    // Test 7: RegistryResponse::not_found helper for 404 responses
     #[test]
     fn test_registry_response_not_found() {
         let resp = RegistryResponse::not_found();
         assert_eq!(resp.status, 404);
     }
 
+    // Test 8: RegistryResponse::blocked helper for 403 responses
     #[test]
     fn test_registry_response_blocked() {
         let resp = RegistryResponse::blocked("malware detected");
@@ -262,12 +268,14 @@ mod tests {
         assert!(String::from_utf8_lossy(&resp.body).contains("malware detected"));
     }
 
+    // Test 9: RegistryResponse content-type customization
     #[test]
     fn test_registry_response_with_content_type() {
         let resp = RegistryResponse::ok("{}").with_content_type("application/json");
         assert_eq!(resp.content_type, "application/json");
     }
 
+    // Test 10: RegistryResponse custom header chaining
     #[test]
     fn test_registry_response_with_header() {
         let resp = RegistryResponse::ok("test")
@@ -285,7 +293,7 @@ mod tests {
         );
     }
 
-    // Test that traits are object safe
+    // Test 11: RegistryPlugin trait is object-safe
     #[test]
     fn test_registry_plugin_is_object_safe() {
         fn _takes_plugin(_: &dyn RegistryPlugin) {}

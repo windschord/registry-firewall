@@ -527,7 +527,7 @@ TDDで`src/plugins/cache/filesystem.rs`にファイルシステムキャッシ�
 - [x] `.meta.json`ファイルにメタデータが保存される
 - [x] TTL期限切れファイルが`purge_expired()`で削除される
 - [x] 最大サイズを超えた場合LRUで削除される
-- [x] テストが5つ以上存在する (15 tests)
+- [x] テストが5つ以上存在する (17 tests)
 - [x] `cargo test filesystem`が通過する
 
 **依存関係**: タスク5.1

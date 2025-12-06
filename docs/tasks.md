@@ -737,16 +737,16 @@ TDDで`src/auth/token.rs`にトークン生成・検証機能を実装する
 - design.mdの「セキュリティ」セクションを参照
 
 **受入基準**:
-- [ ] `generate_token()`関数が実装されている
-- [ ] トークンが`rf_`で始まる
-- [ ] `hash_token()`関数が実装されている（argon2id）
-- [ ] `verify_token()`関数が実装されている
-- [ ] テストが3つ以上存在する
-- [ ] `cargo test token`が通過する
+- [x] `generate_token()`関数が実装されている
+- [x] トークンが`rf_`で始まる
+- [x] `hash_token()`関数が実装されている（argon2id）
+- [x] `verify_token()`関数が実装されている
+- [x] テストが3つ以上存在する (13 tests)
+- [x] `cargo test token`が通過する
 
 **依存関係**: タスク2.2
 **推定工数**: 25分
-**ステータス**: `TODO`
+**ステータス**: `DONE`
 
 #### タスク7.2: レートリミッターの実装
 **説明**:
@@ -766,17 +766,17 @@ TDDで`src/auth/ratelimit.rs`に認証失敗時のレートリミッターを実
 - インメモリで管理
 
 **受入基準**:
-- [ ] `RateLimiter`構造体が定義されている
-- [ ] `record_failure(ip)`メソッドが実装されている
-- [ ] `is_blocked(ip)`メソッドが実装されている
-- [ ] `reset(ip)`メソッドが実装されている
-- [ ] 設定可能な閾値とブロック時間
-- [ ] テストが3つ以上存在する
-- [ ] `cargo test ratelimit`が通過する
+- [x] `RateLimiter`構造体が定義されている
+- [x] `record_failure(ip)`メソッドが実装されている
+- [x] `is_blocked(ip)`メソッドが実装されている
+- [x] `reset(ip)`メソッドが実装されている
+- [x] 設定可能な閾値とブロック時間
+- [x] テストが3つ以上存在する (12 tests)
+- [x] `cargo test ratelimit`が通過する
 
 **依存関係**: なし
 **推定工数**: 25分
-**ステータス**: `TODO`
+**ステータス**: `DONE`
 
 #### タスク7.3: AuthManagerの実装
 **説明**:
@@ -797,19 +797,19 @@ TDDで`src/auth/manager.rs`に認証マネージャーを実装する
 - データベースと連携
 
 **受入基準**:
-- [ ] `AuthManager`構造体が定義されている
-- [ ] `validate_token(token)`メソッドが実装されている
-- [ ] `validate_basic_auth(user, pass)`メソッドが実装されている
-- [ ] `create_token(req)`メソッドが実装されている
-- [ ] `revoke_token(id)`メソッドが実装されている
-- [ ] `list_tokens()`メソッドが実装されている
-- [ ] 許可エコシステムのチェックが実装されている
-- [ ] テストが5つ以上存在する
-- [ ] `cargo test auth::manager`が通過する
+- [x] `AuthManager`構造体が定義されている
+- [x] `validate_token(token)`メソッドが実装されている
+- [x] `validate_basic_auth(user, pass)`メソッドが実装されている
+- [x] `create_token(req)`メソッドが実装されている
+- [x] `revoke_token(id)`メソッドが実装されている
+- [x] `list_tokens()`メソッドが実装されている
+- [x] 許可エコシステムのチェックが実装されている
+- [x] テストが5つ以上存在する (18 tests)
+- [x] `cargo test auth::manager`が通過する
 
 **依存関係**: タスク7.1, タスク7.2, タスク2.4
 **推定工数**: 40分
-**ステータス**: `TODO`
+**ステータス**: `DONE`
 
 ---
 

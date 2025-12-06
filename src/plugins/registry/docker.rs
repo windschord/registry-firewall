@@ -99,7 +99,10 @@ impl DockerPlugin {
     }
 
     /// Parse a Docker registry request path
-    pub fn parse_docker_path(&self, path: &str) -> Result<(String, DockerRequestType, Option<String>), ParseError> {
+    pub fn parse_docker_path(
+        &self,
+        path: &str,
+    ) -> Result<(String, DockerRequestType, Option<String>), ParseError> {
         let path = path
             .strip_prefix(&self.config.path_prefix)
             .unwrap_or(path)
@@ -268,9 +271,7 @@ impl RegistryPlugin for DockerPlugin {
         }
 
         // Build upstream URL
-        let upstream_path = path
-            .strip_prefix(&self.config.path_prefix)
-            .unwrap_or(path);
+        let upstream_path = path.strip_prefix(&self.config.path_prefix).unwrap_or(path);
         let upstream_url = format!("{}/v2{}", self.config.upstream, upstream_path);
 
         // Build request with forwarded headers
@@ -432,10 +433,7 @@ mod tests {
     fn test_parse_manifest_by_digest() {
         let plugin = DockerPlugin::new();
         let req = plugin
-            .parse_request(
-                "/v2/library/nginx/manifests/sha256:abc123",
-                "GET",
-            )
+            .parse_request("/v2/library/nginx/manifests/sha256:abc123", "GET")
             .unwrap();
 
         assert_eq!(req.name, "library/nginx");

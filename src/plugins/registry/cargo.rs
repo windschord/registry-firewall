@@ -176,7 +176,10 @@ impl CargoPlugin {
     }
 
     /// Parse a Cargo request path
-    pub fn parse_cargo_path(&self, path: &str) -> Result<(String, CargoRequestType, Option<String>), ParseError> {
+    pub fn parse_cargo_path(
+        &self,
+        path: &str,
+    ) -> Result<(String, CargoRequestType, Option<String>), ParseError> {
         let path = path
             .strip_prefix(&self.config.path_prefix)
             .unwrap_or(path)
@@ -239,9 +242,7 @@ impl CargoPlugin {
         // Format: {name}-{version}.crate
         let prefix = format!("{}-", name);
         if filename.starts_with(&prefix) && filename.ends_with(".crate") {
-            let version = filename
-                .strip_prefix(&prefix)?
-                .strip_suffix(".crate")?;
+            let version = filename.strip_prefix(&prefix)?.strip_suffix(".crate")?;
             return Some(version.to_string());
         }
         None
@@ -337,9 +338,7 @@ impl RegistryPlugin for CargoPlugin {
         }
 
         // Build upstream URL
-        let upstream_path = path
-            .strip_prefix(&self.config.path_prefix)
-            .unwrap_or(path);
+        let upstream_path = path.strip_prefix(&self.config.path_prefix).unwrap_or(path);
 
         let upstream_url = match req_type {
             CargoRequestType::Download => {
@@ -446,9 +445,7 @@ mod tests {
     #[test]
     fn test_parse_index_request() {
         let plugin = CargoPlugin::new();
-        let req = plugin
-            .parse_request("/cargo/se/rd/serde", "GET")
-            .unwrap();
+        let req = plugin.parse_request("/cargo/se/rd/serde", "GET").unwrap();
 
         assert_eq!(req.ecosystem, "cargo");
         assert_eq!(req.name, "serde");
@@ -518,7 +515,9 @@ mod tests {
 {"name":"test","vers":"1.0.1","cksum":"b","deps":[],"features":{}}"#;
 
         let blocked = vec![BlockedVersion::new("1.0.1", "test")];
-        let result = plugin.filter_metadata(content.as_bytes(), &blocked).unwrap();
+        let result = plugin
+            .filter_metadata(content.as_bytes(), &blocked)
+            .unwrap();
         let filtered = String::from_utf8(result).unwrap();
 
         assert!(filtered.contains("1.0.0"));

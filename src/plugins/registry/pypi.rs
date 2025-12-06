@@ -71,9 +71,7 @@ impl PyPIPlugin {
     /// Parse a Simple API request path
     fn parse_simple_api_path(&self, path: &str) -> Result<String, ParseError> {
         // Remove the prefix
-        let path = path
-            .strip_prefix(&self.config.path_prefix)
-            .unwrap_or(path);
+        let path = path.strip_prefix(&self.config.path_prefix).unwrap_or(path);
 
         // Simple API path: /simple/{package}/ or /simple/{package}
         if let Some(rest) = path.strip_prefix("/simple/") {
@@ -95,9 +93,7 @@ impl PyPIPlugin {
     /// Parse a package file download path
     fn parse_packages_path(&self, path: &str) -> Result<(String, String, String), ParseError> {
         // Remove the prefix
-        let path = path
-            .strip_prefix(&self.config.path_prefix)
-            .unwrap_or(path);
+        let path = path.strip_prefix(&self.config.path_prefix).unwrap_or(path);
 
         // Packages path: /packages/{hash_prefix}/{hash}/{filename}
         // or /packages/source/{first_letter}/{package}/{filename}
@@ -181,7 +177,17 @@ impl PyPIPlugin {
                         || trimmed.contains(&format!("-{}.whl", bv.version))
                         || trimmed.contains(&format!("-{}.zip", bv.version))
                         || trimmed.contains(&format!("-{}-", bv.version))
-                        || trimmed.contains(&format!(">{}-{}", trimmed.split('>').nth(1).unwrap_or("").split('-').next().unwrap_or(""), bv.version))
+                        || trimmed.contains(&format!(
+                            ">{}-{}",
+                            trimmed
+                                .split('>')
+                                .nth(1)
+                                .unwrap_or("")
+                                .split('-')
+                                .next()
+                                .unwrap_or(""),
+                            bv.version
+                        ))
                 });
 
                 if should_block {
@@ -272,9 +278,7 @@ impl RegistryPlugin for PyPIPlugin {
         }
 
         // Build upstream URL
-        let upstream_path = path
-            .strip_prefix(&self.config.path_prefix)
-            .unwrap_or(path);
+        let upstream_path = path.strip_prefix(&self.config.path_prefix).unwrap_or(path);
         let upstream_url = format!("{}{}", self.config.upstream, upstream_path);
 
         // Fetch from upstream
@@ -372,13 +376,17 @@ mod tests {
     fn test_parse_simple_api_request() {
         let plugin = PyPIPlugin::new();
 
-        let req = plugin.parse_request("/pypi/simple/requests/", "GET").unwrap();
+        let req = plugin
+            .parse_request("/pypi/simple/requests/", "GET")
+            .unwrap();
         assert_eq!(req.ecosystem, "pypi");
         assert_eq!(req.name, "requests");
         assert_eq!(req.request_type, RequestType::Metadata);
         assert!(req.is_metadata());
 
-        let req = plugin.parse_request("/pypi/simple/Flask-RESTful/", "GET").unwrap();
+        let req = plugin
+            .parse_request("/pypi/simple/Flask-RESTful/", "GET")
+            .unwrap();
         assert_eq!(req.name, "flask-restful");
     }
 
@@ -388,10 +396,7 @@ mod tests {
 
         // Test tar.gz file
         let req = plugin
-            .parse_request(
-                "/pypi/packages/ab/cd/requests-2.31.0.tar.gz",
-                "GET",
-            )
+            .parse_request("/pypi/packages/ab/cd/requests-2.31.0.tar.gz", "GET")
             .unwrap();
         assert_eq!(req.ecosystem, "pypi");
         assert_eq!(req.name, "requests");

@@ -112,7 +112,10 @@ impl GoModulePlugin {
     }
 
     /// Parse a Go module request path
-    pub fn parse_go_path(&self, path: &str) -> Result<(String, GoRequestType, Option<String>), ParseError> {
+    pub fn parse_go_path(
+        &self,
+        path: &str,
+    ) -> Result<(String, GoRequestType, Option<String>), ParseError> {
         // Remove the prefix
         let path = path
             .strip_prefix(&self.config.path_prefix)
@@ -246,9 +249,7 @@ impl RegistryPlugin for GoModulePlugin {
         }
 
         // Build upstream URL
-        let upstream_path = path
-            .strip_prefix(&self.config.path_prefix)
-            .unwrap_or(path);
+        let upstream_path = path.strip_prefix(&self.config.path_prefix).unwrap_or(path);
         let upstream_url = format!("{}{}", self.config.upstream, upstream_path);
 
         // Fetch from upstream

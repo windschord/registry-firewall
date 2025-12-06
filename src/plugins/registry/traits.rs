@@ -275,7 +275,10 @@ mod tests {
             .with_header("Cache-Control", "no-cache");
 
         assert_eq!(resp.headers.len(), 2);
-        assert_eq!(resp.headers[0], ("X-Custom".to_string(), "value".to_string()));
+        assert_eq!(
+            resp.headers[0],
+            ("X-Custom".to_string(), "value".to_string())
+        );
         assert_eq!(
             resp.headers[1],
             ("Cache-Control".to_string(), "no-cache".to_string())

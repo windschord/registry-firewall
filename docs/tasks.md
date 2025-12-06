@@ -555,7 +555,7 @@ TDDで`src/plugins/cache/redis.rs`にRedisキャッシュを実装する
 - [x] `CachePlugin`トレイトが実装されている
 - [x] Redis接続が設定可能
 - [x] TTLがRedisのEXPIREで設定される（プレースホルダー実装）
-- [x] テストが3つ以上存在する (11 tests)
+- [x] テストが3つ以上存在する (12 tests)
 - [x] `cargo test redis`が通過する（Redisが利用可能な場合）
 
 **依存関係**: タスク5.1

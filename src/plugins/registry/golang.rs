@@ -224,7 +224,6 @@ impl RegistryPlugin for GoModulePlugin {
         _method: &str,
         _headers: &[(String, String)],
     ) -> Result<RegistryResponse, ProxyError> {
-        let _pkg_req = self.parse_request(path, "GET")?;
         let (module, req_type, version) = self.parse_go_path(path)?;
 
         // Check security plugins for blocked packages/versions

@@ -170,24 +170,16 @@ impl PyPIPlugin {
             // Check if this line contains an <a> tag with href
             if trimmed.contains("<a ") && trimmed.contains("href=") {
                 // Check if any blocked version is in this line
+                // PyPI package filenames follow patterns:
+                // - {package}-{version}.tar.gz
+                // - {package}-{version}.zip
+                // - {package}-{version}-{tags}.whl
                 let should_block = blocked.iter().any(|bv| {
-                    // Check for version patterns in href or link text
-                    // Patterns: -VERSION.ext, -VERSION-tag, -VERSION)
+                    // Match version at common boundaries in filenames
                     trimmed.contains(&format!("-{}.tar", bv.version))
-                        || trimmed.contains(&format!("-{}.whl", bv.version))
                         || trimmed.contains(&format!("-{}.zip", bv.version))
-                        || trimmed.contains(&format!("-{}-", bv.version))
-                        || trimmed.contains(&format!(
-                            ">{}-{}",
-                            trimmed
-                                .split('>')
-                                .nth(1)
-                                .unwrap_or("")
-                                .split('-')
-                                .next()
-                                .unwrap_or(""),
-                            bv.version
-                        ))
+                        || trimmed.contains(&format!("-{}-", bv.version)) // wheel with build tags
+                        || trimmed.contains(&format!("-{}.whl", bv.version)) // wheel without build tags
                 });
 
                 if should_block {

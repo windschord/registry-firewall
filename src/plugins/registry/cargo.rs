@@ -166,12 +166,20 @@ impl CargoPlugin {
     /// - 4+ characters: {first two}/{next two}/{name}
     pub fn index_prefix(name: &str) -> String {
         let lower = name.to_lowercase();
-        match lower.len() {
+        let char_count = lower.chars().count();
+        match char_count {
             0 => String::new(),
             1 => format!("1/{}", lower),
             2 => format!("2/{}", lower),
-            3 => format!("3/{}/{}", &lower[0..1], lower),
-            _ => format!("{}/{}/{}", &lower[0..2], &lower[2..4], lower),
+            3 => {
+                let first: String = lower.chars().take(1).collect();
+                format!("3/{}/{}", first, lower)
+            }
+            _ => {
+                let first_two: String = lower.chars().take(2).collect();
+                let next_two: String = lower.chars().skip(2).take(2).collect();
+                format!("{}/{}/{}", first_two, next_two, lower)
+            }
         }
     }
 
@@ -313,21 +321,20 @@ impl RegistryPlugin for CargoPlugin {
         _method: &str,
         _headers: &[(String, String)],
     ) -> Result<RegistryResponse, ProxyError> {
-        let pkg_req = self.parse_request(path, "GET")?;
-        let (_name, req_type, version) = self.parse_cargo_path(path)?;
+        let (name, req_type, version) = self.parse_cargo_path(path)?;
 
         // Check security plugins for blocked packages/versions
         let mut blocked_versions = Vec::new();
         for plugin in &ctx.security_plugins {
             if let Some(ver) = &version {
-                if let Some(reason) = plugin.check_package("cargo", &pkg_req.name, ver).await {
+                if let Some(reason) = plugin.check_package("cargo", &name, ver).await {
                     return Ok(RegistryResponse::blocked(&reason.reason));
                 }
             } else if req_type == CargoRequestType::Index {
                 // For index requests, collect all blocked versions
                 let blocked = plugin.get_blocked_packages("cargo").await;
                 for pkg in blocked {
-                    if pkg.package.to_lowercase() == pkg_req.name.to_lowercase() {
+                    if pkg.package.to_lowercase() == name.to_lowercase() {
                         blocked_versions.push(BlockedVersion::new(
                             &pkg.version,
                             pkg.reason.unwrap_or_else(|| "Blocked".to_string()),

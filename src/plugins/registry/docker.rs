@@ -242,7 +242,6 @@ impl RegistryPlugin for DockerPlugin {
         _method: &str,
         headers: &[(String, String)],
     ) -> Result<RegistryResponse, ProxyError> {
-        let _pkg_req = self.parse_request(path, "GET")?;
         let (name, req_type, reference) = self.parse_docker_path(path)?;
 
         // Check security plugins for blocked packages/versions

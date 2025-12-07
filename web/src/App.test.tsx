@@ -16,6 +16,11 @@ vi.mock('./pages/Settings', () => ({
   default: () => <div data-testid="settings-page">Settings Page</div>,
 }))
 
+const routerFuture = {
+  v7_startTransition: true,
+  v7_relativeSplatPath: true,
+}
+
 describe('App', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -23,7 +28,7 @@ describe('App', () => {
 
   it('renders the sidebar with title', () => {
     render(
-      <MemoryRouter>
+      <MemoryRouter future={routerFuture}>
         <App />
       </MemoryRouter>
     )
@@ -34,7 +39,7 @@ describe('App', () => {
 
   it('renders navigation items', () => {
     render(
-      <MemoryRouter>
+      <MemoryRouter future={routerFuture}>
         <App />
       </MemoryRouter>
     )
@@ -46,7 +51,7 @@ describe('App', () => {
 
   it('renders Dashboard page on root path', () => {
     render(
-      <MemoryRouter initialEntries={['/']}>
+      <MemoryRouter initialEntries={['/']} future={routerFuture}>
         <App />
       </MemoryRouter>
     )
@@ -56,7 +61,7 @@ describe('App', () => {
 
   it('renders Block Logs page on /blocks path', () => {
     render(
-      <MemoryRouter initialEntries={['/blocks']}>
+      <MemoryRouter initialEntries={['/blocks']} future={routerFuture}>
         <App />
       </MemoryRouter>
     )
@@ -66,7 +71,7 @@ describe('App', () => {
 
   it('renders Settings page on /settings path', () => {
     render(
-      <MemoryRouter initialEntries={['/settings']}>
+      <MemoryRouter initialEntries={['/settings']} future={routerFuture}>
         <App />
       </MemoryRouter>
     )
@@ -76,7 +81,7 @@ describe('App', () => {
 
   it('highlights active navigation link', () => {
     render(
-      <MemoryRouter initialEntries={['/blocks']}>
+      <MemoryRouter initialEntries={['/blocks']} future={routerFuture}>
         <App />
       </MemoryRouter>
     )

@@ -143,6 +143,10 @@ async fn metrics_handler() -> impl IntoResponse {
 // =============================================================================
 
 /// Generic registry proxy handler
+///
+/// **Note**: This is currently a placeholder implementation. Full proxy
+/// functionality including security checks, caching, and upstream forwarding
+/// will be implemented in Phase 11 integration tasks.
 async fn registry_proxy_handler<D: Database + 'static>(
     State(_state): State<AppState<D>>,
     Path(_path): Path<String>,
@@ -202,7 +206,7 @@ async fn api_security_sources_handler<D: Database + 'static>(
                 "name": p.name(),
                 "ecosystems": p.supported_ecosystems(),
                 "last_sync": status.last_sync_at,
-                "status": format!("{:?}", status.status),
+                "status": status.status.to_string(),
                 "records_count": status.records_count
             })
         })
@@ -414,12 +418,30 @@ pub struct CreateTokenApiRequest {
     pub expires_at: Option<chrono::DateTime<chrono::Utc>>,
 }
 
+/// Maximum length for token names
+const MAX_TOKEN_NAME_LENGTH: usize = 256;
+
 /// Create token handler
 async fn api_create_token_handler<D: Database + 'static>(
     State(state): State<AppState<D>>,
     Json(req): Json<CreateTokenApiRequest>,
 ) -> impl IntoResponse {
-    let create_req = crate::models::CreateTokenRequest::new(&req.name)
+    // Validate name field
+    let name = req.name.trim();
+    if name.is_empty() {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({ "error": "Token name cannot be empty" })),
+        );
+    }
+    if name.len() > MAX_TOKEN_NAME_LENGTH {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({ "error": "Token name exceeds maximum length" })),
+        );
+    }
+
+    let create_req = crate::models::CreateTokenRequest::new(name)
         .with_ecosystems(req.allowed_ecosystems.unwrap_or_default());
 
     let create_req = if let Some(expires_at) = req.expires_at {

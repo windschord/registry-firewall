@@ -37,11 +37,18 @@ impl<D: Database + 'static> Server<D> {
     }
 
     /// Get the configured bind address
-    pub fn bind_addr(&self) -> SocketAddr {
-        SocketAddr::new(
-            self.config.host.parse().unwrap_or([0, 0, 0, 0].into()),
-            self.config.port,
-        )
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the host address cannot be parsed
+    pub fn bind_addr(&self) -> Result<SocketAddr, ServerError> {
+        let ip = self.config.host.parse().map_err(|e| {
+            ServerError::Config(format!(
+                "Invalid host address '{}': {}",
+                self.config.host, e
+            ))
+        })?;
+        Ok(SocketAddr::new(ip, self.config.port))
     }
 
     /// Run the server until shutdown signal is received
@@ -57,7 +64,7 @@ impl<D: Database + 'static> Server<D> {
         self,
         shutdown: impl Future<Output = ()> + Send + 'static,
     ) -> Result<(), ServerError> {
-        let addr = self.bind_addr();
+        let addr = self.bind_addr()?;
         let app = build_router(self.state);
 
         // Apply middleware layers
@@ -129,7 +136,7 @@ mod tests {
         let config = ServerConfig::default();
         let state = create_test_state();
         let server = Server::new(config, state);
-        assert_eq!(server.bind_addr().port(), 8080);
+        assert_eq!(server.bind_addr().unwrap().port(), 8080);
     }
 
     // Test 2: Server bind address calculation
@@ -142,7 +149,25 @@ mod tests {
         };
         let state = create_test_state();
         let server = Server::new(config, state);
-        assert_eq!(server.bind_addr().to_string(), "127.0.0.1:9090");
+        assert_eq!(server.bind_addr().unwrap().to_string(), "127.0.0.1:9090");
+    }
+
+    // Test 2b: Invalid host address returns error
+    #[test]
+    fn test_server_bind_addr_invalid_host() {
+        let config = ServerConfig {
+            host: "invalid-host".to_string(),
+            port: 9090,
+            ..Default::default()
+        };
+        let state = create_test_state();
+        let server = Server::new(config, state);
+        let result = server.bind_addr();
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Invalid host address"));
     }
 
     // Test 3: Server graceful shutdown

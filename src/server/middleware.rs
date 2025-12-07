@@ -20,8 +20,12 @@ use crate::database::Database;
 use crate::error::AuthError;
 use crate::models::Client;
 
-/// Paths that should skip authentication
+/// Paths that should skip authentication (exact match only)
 const AUTH_SKIP_PATHS: &[&str] = &["/health", "/metrics"];
+
+/// Maximum size for basic auth credentials (Base64 encoded)
+/// Prevents DoS attacks with oversized credentials
+const MAX_BASIC_AUTH_LENGTH: usize = 1024;
 
 /// Authentication middleware layer
 pub struct AuthLayer<D: Database> {
@@ -73,8 +77,8 @@ pub async fn auth_middleware<D: Database + 'static>(
 ) -> Result<Response, AuthResponse> {
     let path = request.uri().path();
 
-    // Skip authentication for specific paths
-    if AUTH_SKIP_PATHS.iter().any(|p| path.starts_with(p)) {
+    // Skip authentication for specific paths (exact match only to prevent bypass)
+    if AUTH_SKIP_PATHS.contains(&path) {
         return Ok(next.run(request).await);
     }
 
@@ -102,6 +106,10 @@ pub async fn auth_middleware<D: Database + 'static>(
         }
         Some(header) if header.starts_with("Basic ") => {
             let credentials = header.trim_start_matches("Basic ");
+            // Check size limit to prevent DoS attacks
+            if credentials.len() > MAX_BASIC_AUTH_LENGTH {
+                return Err(AuthResponse::invalid_credentials());
+            }
             let decoded =
                 base64::Engine::decode(&base64::engine::general_purpose::STANDARD, credentials)
                     .map_err(|_| AuthResponse::invalid_credentials())?;

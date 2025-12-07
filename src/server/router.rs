@@ -23,7 +23,10 @@ use crate::plugins::cache::traits::CachePlugin;
 use crate::plugins::registry::RegistryPlugin;
 use crate::plugins::security::traits::SecuritySourcePlugin;
 use crate::server::middleware::auth_middleware;
-use crate::webui::api::{self, BlockLogsQuery};
+use crate::webui::api::{
+    self, BlockLogsQuery, DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT, MAX_PATTERN_LENGTH,
+    MAX_REASON_LENGTH, MAX_TOKEN_NAME_LENGTH,
+};
 
 /// Shared application state
 pub struct AppState<D: Database> {
@@ -193,16 +196,22 @@ async fn api_dashboard_handler<D: Database + 'static>(
 }
 
 /// Block logs API handler
+///
+/// Query parameters:
+/// - `limit`: Number of logs to return (default: 50, max: 1000)
+/// - `offset`: Pagination offset (default: 0)
 async fn api_blocks_handler<D: Database + 'static>(
     State(state): State<AppState<D>>,
     Query(query): Query<BlockLogsQuery>,
 ) -> impl IntoResponse {
-    let limit = query.limit.unwrap_or(50).min(1000);
+    // Validate and apply limits using constants
+    let limit = query.limit.unwrap_or(DEFAULT_PAGE_LIMIT).min(MAX_PAGE_LIMIT);
     let offset = query.offset.unwrap_or(0);
 
     match api::get_block_logs(state.database.as_ref(), limit, offset).await {
         Ok(response) => (StatusCode::OK, Json(response)),
         Err(e) => {
+            // Log detailed error but return generic message to client
             tracing::error!(error = %e, "Failed to get block logs");
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
@@ -282,10 +291,53 @@ async fn api_list_rules_handler<D: Database + 'static>(
 }
 
 /// Create custom rule handler
+///
+/// Validates rule fields before insertion:
+/// - package_pattern: required, max 512 characters
+/// - version_constraint: optional, max 512 characters
+/// - reason: optional, max 1024 characters
 async fn api_create_rule_handler<D: Database + 'static>(
     State(state): State<AppState<D>>,
     Json(rule): Json<crate::models::CustomRule>,
 ) -> impl IntoResponse {
+    // Validate package_pattern
+    if rule.package_pattern.is_empty() {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({ "error": "Package pattern cannot be empty" })),
+        );
+    }
+    if rule.package_pattern.len() > MAX_PATTERN_LENGTH {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({ "error": "Package pattern exceeds maximum length" })),
+        );
+    }
+
+    // Validate version_constraint
+    if rule.version_constraint.len() > MAX_PATTERN_LENGTH {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({ "error": "Version constraint exceeds maximum length" })),
+        );
+    }
+
+    // Validate reason if provided
+    if let Some(ref reason) = rule.reason {
+        if reason.len() > MAX_REASON_LENGTH {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::json!({ "error": "Reason exceeds maximum length" })),
+            );
+        }
+    }
+
+    tracing::info!(
+        ecosystem = %rule.ecosystem,
+        package = %rule.package_pattern,
+        "Creating custom block rule"
+    );
+
     match state.database.insert_rule(&rule).await {
         Ok(id) => (
             StatusCode::CREATED,
@@ -345,45 +397,39 @@ async fn api_update_rule_handler<D: Database + 'static>(
 }
 
 /// Delete custom rule handler
+///
+/// Returns 204 No Content on success (REST best practice for DELETE).
 async fn api_delete_rule_handler<D: Database + 'static>(
     State(state): State<AppState<D>>,
     Path(id): Path<i64>,
 ) -> impl IntoResponse {
+    tracing::info!(rule_id = id, "Deleting custom block rule");
+
     match state.database.delete_rule(id).await {
-        Ok(_) => (
-            StatusCode::OK,
-            Json(serde_json::json!({ "message": "Rule deleted" })),
-        ),
+        Ok(_) => StatusCode::NO_CONTENT.into_response(),
         Err(e) => {
             tracing::error!(error = %e, rule_id = id, "Failed to delete rule");
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(serde_json::json!({ "error": "Failed to delete rule" })),
             )
+                .into_response()
         }
     }
 }
 
 /// List tokens handler
+///
+/// Returns token metadata with masked token prefix for identification.
+/// Full token values are never exposed after creation.
 async fn api_list_tokens_handler<D: Database + 'static>(
     State(state): State<AppState<D>>,
 ) -> impl IntoResponse {
     match state.auth_manager.list_tokens().await {
         Ok(tokens) => {
-            // Don't expose token hashes
-            let safe_tokens: Vec<serde_json::Value> = tokens
-                .iter()
-                .map(|t| {
-                    serde_json::json!({
-                        "id": t.id,
-                        "name": t.name,
-                        "created_at": t.created_at,
-                        "expires_at": t.expires_at,
-                        "last_used_at": t.last_used_at,
-                        "allowed_ecosystems": t.allowed_ecosystems
-                    })
-                })
-                .collect();
+            // Convert to safe TokenInfo (includes masked prefix, excludes hash)
+            let safe_tokens: Vec<api::TokenInfo> =
+                tokens.iter().map(api::TokenInfo::from).collect();
             (
                 StatusCode::OK,
                 Json(serde_json::json!({ "tokens": safe_tokens })),
@@ -406,9 +452,6 @@ pub struct CreateTokenApiRequest {
     pub allowed_ecosystems: Option<Vec<String>>,
     pub expires_at: Option<chrono::DateTime<chrono::Utc>>,
 }
-
-/// Maximum length for token names
-const MAX_TOKEN_NAME_LENGTH: usize = 256;
 
 /// Create token handler
 async fn api_create_token_handler<D: Database + 'static>(
@@ -460,22 +503,26 @@ async fn api_create_token_handler<D: Database + 'static>(
     }
 }
 
-/// Delete token handler
+/// Delete (revoke) token handler
+///
+/// Returns 204 No Content on success (REST best practice for DELETE).
+/// Token ID is logged for audit purposes (never the token value).
 async fn api_delete_token_handler<D: Database + 'static>(
     State(state): State<AppState<D>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::info!(token_id = %id, "Revoking API token");
+
     match state.auth_manager.revoke_token(&id).await {
-        Ok(_) => (
-            StatusCode::OK,
-            Json(serde_json::json!({ "message": "Token revoked" })),
-        ),
+        Ok(_) => StatusCode::NO_CONTENT.into_response(),
         Err(e) => {
+            // Log error but don't expose internal details to client
             tracing::error!(error = %e, token_id = %id, "Failed to revoke token");
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(serde_json::json!({ "error": "Failed to revoke token" })),
             )
+                .into_response()
         }
     }
 }

@@ -2,6 +2,13 @@
 //!
 //! This module provides REST API endpoints for the Web UI.
 //! All endpoints require authentication unless otherwise noted.
+//!
+//! # Security Notes
+//!
+//! - Token values are never logged and only returned once at creation time
+//! - Internal error details are logged but not exposed to clients
+//! - All endpoints require authentication via the auth middleware
+//! - Destructive operations log the action for audit purposes
 
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -11,6 +18,29 @@ use crate::models::{BlockLog, CustomRule, Token};
 use crate::plugins::cache::traits::CachePlugin;
 use crate::plugins::security::traits::SecuritySourcePlugin;
 use crate::sync::ManualSyncHandle;
+
+// =============================================================================
+// Constants
+// =============================================================================
+
+/// Default number of items per page for pagination
+pub const DEFAULT_PAGE_LIMIT: u32 = 50;
+
+/// Maximum number of items per page for pagination.
+/// This limit prevents excessive database queries and memory usage.
+pub const MAX_PAGE_LIMIT: u32 = 1000;
+
+/// Maximum length for token names
+pub const MAX_TOKEN_NAME_LENGTH: usize = 256;
+
+/// Maximum length for rule patterns
+pub const MAX_PATTERN_LENGTH: usize = 512;
+
+/// Maximum length for reason text
+pub const MAX_REASON_LENGTH: usize = 1024;
+
+/// Number of characters to show in masked token prefix
+pub const TOKEN_MASK_PREFIX_LENGTH: usize = 8;
 
 // =============================================================================
 // Request/Response Types
@@ -184,13 +214,15 @@ pub struct TokensResponse {
     pub tokens: Vec<TokenInfo>,
 }
 
-/// Token information (safe to return)
+/// Token information (safe to return - never exposes full token value)
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct TokenInfo {
     /// Token ID
     pub id: String,
     /// Token name
     pub name: String,
+    /// Masked token prefix for identification (e.g., "rf_abc1***")
+    pub token_prefix: String,
     /// Created at
     pub created_at: chrono::DateTime<chrono::Utc>,
     /// Expires at
@@ -203,9 +235,12 @@ pub struct TokenInfo {
 
 impl From<&Token> for TokenInfo {
     fn from(token: &Token) -> Self {
+        // Create masked token prefix from ID (tokens start with rf_)
+        let prefix = format!("rf_{}***", &token.id[..TOKEN_MASK_PREFIX_LENGTH.min(token.id.len())]);
         Self {
             id: token.id.clone(),
             name: token.name.clone(),
+            token_prefix: prefix,
             created_at: token.created_at,
             expires_at: token.expires_at,
             last_used_at: token.last_used_at,

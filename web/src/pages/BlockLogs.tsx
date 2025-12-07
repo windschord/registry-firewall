@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { getBlockLogs, BlockLogEntry, BlockLogsResponse } from '../api/client'
 
 export default function BlockLogs() {
@@ -9,7 +9,7 @@ export default function BlockLogs() {
   const [page, setPage] = useState(0)
   const limit = 20
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       setLoading(true)
       const data: BlockLogsResponse = await getBlockLogs(limit, page * limit)
@@ -21,11 +21,11 @@ export default function BlockLogs() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [page])
 
   useEffect(() => {
     fetchData()
-  }, [page])
+  }, [fetchData])
 
   const totalPages = Math.ceil(total / limit)
 

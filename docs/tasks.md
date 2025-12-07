@@ -954,17 +954,17 @@ TDDで`src/otel/mod.rs`にOpenTelemetryプロバイダーを実装する
 - design.mdの「OTEL Provider」セクションを参照
 
 **受入基準**:
-- [ ] `OtelProvider`構造体が定義されている
-- [ ] `OtelProvider::new(config)`が実装されている
-- [ ] `tracer()`メソッドが実装されている
-- [ ] `meter()`メソッドが実装されている
-- [ ] `shutdown()`メソッドが実装されている
-- [ ] テストが3つ以上存在する
-- [ ] `cargo test otel`が通過する
+- [x] `OtelProvider`構造体が定義されている
+- [x] `OtelProvider::new(config)`が実装されている
+- [x] `tracer()`メソッドが実装されている
+- [x] `meter()`メソッドが実装されている
+- [x] `shutdown()`メソッドが実装されている
+- [x] テストが3つ以上存在する (13 tests)
+- [x] `cargo test otel`が通過する
 
 **依存関係**: タスク2.1
 **推定工数**: 30分
-**ステータス**: `TODO`
+**ステータス**: `DONE`
 
 #### タスク9.2: メトリクス定義の実装
 **説明**:
@@ -980,18 +980,18 @@ TDDでアプリケーションメトリクスを定義・実装する
 - design.mdの「メトリクス定義」セクションを参照
 
 **受入基準**:
-- [ ] `Metrics`構造体が定義されている
-- [ ] `requests_total` Counterが定義されている
-- [ ] `blocked_total` Counterが定義されている
-- [ ] `cache_hits_total`, `cache_misses_total` Counterが定義されている
-- [ ] `request_duration`, `upstream_duration` Histogramが定義されている
-- [ ] `cache_size_bytes`, `blocked_packages_count` Gaugeが定義されている
-- [ ] テストが2つ以上存在する
-- [ ] `cargo test metrics`が通過する
+- [x] `Metrics`構造体が定義されている
+- [x] `requests_total` Counterが定義されている
+- [x] `blocked_total` Counterが定義されている
+- [x] `cache_hits_total`, `cache_misses_total` Counterが定義されている
+- [x] `request_duration`, `upstream_duration` Histogramが定義されている
+- [x] `cache_size_bytes`, `blocked_packages_count` Gaugeが定義されている（Observable Gauge）
+- [x] テストが2つ以上存在する (13 tests in otel module)
+- [x] `cargo test metrics`が通過する
 
 **依存関係**: タスク9.1
 **推定工数**: 20分
-**ステータス**: `TODO`
+**ステータス**: `DONE`
 
 ---
 

@@ -30,8 +30,8 @@ reqwest = { version = "0.12", features = ["json", "gzip"] }
 
 # OpenTelemetry
 opentelemetry = "0.22"
-opentelemetry-otlp = "0.15"
-opentelemetry_sdk = { version = "0.22", features = ["rt-tokio"] }
+opentelemetry-otlp = { version = "0.15", features = ["metrics", "trace"] }
+opentelemetry_sdk = { version = "0.22", features = ["rt-tokio", "metrics"] }
 tracing = "0.1"
 tracing-opentelemetry = "0.23"
 tracing-subscriber = { version = "0.3", features = ["json", "env-filter"] }

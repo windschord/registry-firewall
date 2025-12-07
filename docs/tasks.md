@@ -1018,20 +1018,20 @@ TDDで`src/webui/api.rs`にWeb UI用のAPIエンドポイントを実装する
 - JSON形式でレスポンス
 
 **受入基準**:
-- [ ] `GET /api/dashboard`が実装されている
-- [ ] `GET /api/blocks`が実装されている
-- [ ] `GET /api/security-sources`が実装されている
-- [ ] `POST /api/security-sources/{name}/sync`が実装されている
-- [ ] `GET /api/cache/stats`が実装されている
-- [ ] `DELETE /api/cache`が実装されている
-- [ ] `GET/POST/PUT/DELETE /api/rules`が実装されている
-- [ ] `GET/POST/DELETE /api/tokens`が実装されている
-- [ ] テストが8つ以上存在する
-- [ ] `cargo test webui::api`が通過する
+- [x] `GET /api/dashboard`が実装されている
+- [x] `GET /api/blocks`が実装されている
+- [x] `GET /api/security-sources`が実装されている
+- [x] `POST /api/security-sources/{name}/sync`が実装されている
+- [x] `GET /api/cache/stats`が実装されている
+- [x] `DELETE /api/cache`が実装されている
+- [x] `GET/POST/PUT/DELETE /api/rules`が実装されている
+- [x] `GET/POST/DELETE /api/tokens`が実装されている
+- [x] テストが8つ以上存在する (16 tests)
+- [x] `cargo test webui::api`が通過する
 
 **依存関係**: タスク2.4, タスク7.3, タスク5.2
 **推定工数**: 60分
-**ステータス**: `TODO`
+**ステータス**: `DONE`
 
 #### タスク10.2: Reactフロントエンドの作成
 **説明**:
@@ -1049,17 +1049,17 @@ TDDで`src/webui/api.rs`にWeb UI用のAPIエンドポイントを実装する
 - design.mdの「Web UI」セクションを参照
 
 **受入基準**:
-- [ ] `web/package.json`が存在する
-- [ ] `web/src/App.tsx`が存在する
-- [ ] ダッシュボードページが実装されている
-- [ ] ブロックログページが実装されている
-- [ ] 設定ページが実装されている
-- [ ] `npm run build`が成功する
-- [ ] ビルド成果物が`web/dist/`に生成される
+- [x] `web/package.json`が存在する
+- [x] `web/src/App.tsx`が存在する
+- [x] ダッシュボードページが実装されている
+- [x] ブロックログページが実装されている
+- [x] 設定ページが実装されている
+- [x] `npm run build`が成功する
+- [x] ビルド成果物が`web/dist/`に生成される
 
 **依存関係**: タスク10.1
 **推定工数**: 90分
-**ステータス**: `TODO`
+**ステータス**: `DONE`
 
 #### タスク10.3: 静的ファイル埋め込みの実装
 **説明**:
@@ -1077,15 +1077,15 @@ TDDで`src/webui/api.rs`にWeb UI用のAPIエンドポイントを実装する
 - `web/dist/`ディレクトリを埋め込み
 
 **受入基準**:
-- [ ] `#[derive(RustEmbed)]`で静的ファイルが埋め込まれている
-- [ ] `/ui/`パスで静的ファイルが配信される
-- [ ] Content-Typeが適切に設定される
-- [ ] テストが2つ以上存在する
-- [ ] `cargo test webui::embed`が通過する
+- [x] `#[derive(RustEmbed)]`で静的ファイルが埋め込まれている
+- [x] `/ui/`パスで静的ファイルが配信される
+- [x] Content-Typeが適切に設定される
+- [x] テストが2つ以上存在する (8 tests)
+- [x] `cargo test webui`が通過する
 
 **依存関係**: タスク10.2
 **推定工数**: 20分
-**ステータス**: `TODO`
+**ステータス**: `DONE`
 
 ---
 

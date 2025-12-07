@@ -7,7 +7,7 @@
 //! - Web UI and API endpoints
 
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::StatusCode,
     middleware,
     response::{IntoResponse, Json},
@@ -23,6 +23,7 @@ use crate::plugins::cache::traits::CachePlugin;
 use crate::plugins::registry::RegistryPlugin;
 use crate::plugins::security::traits::SecuritySourcePlugin;
 use crate::server::middleware::auth_middleware;
+use crate::webui::api::{self, BlockLogsQuery};
 
 /// Shared application state
 pub struct AppState<D: Database> {
@@ -180,48 +181,46 @@ async fn registry_proxy_handler<D: Database + 'static>(
 
 /// Dashboard API handler
 async fn api_dashboard_handler<D: Database + 'static>(
-    State(_state): State<AppState<D>>,
+    State(state): State<AppState<D>>,
 ) -> impl IntoResponse {
-    // TODO: Implement proper dashboard stats
-    Json(serde_json::json!({
-        "total_requests": 0,
-        "blocked_requests": 0,
-        "cache_hit_rate": 0.0,
-        "security_sources": []
-    }))
+    let stats = api::build_dashboard_stats(
+        state.database.as_ref(),
+        &state.security_plugins,
+        &state.cache_plugin,
+    )
+    .await;
+    Json(stats)
 }
 
 /// Block logs API handler
 async fn api_blocks_handler<D: Database + 'static>(
-    State(_state): State<AppState<D>>,
+    State(state): State<AppState<D>>,
+    Query(query): Query<BlockLogsQuery>,
 ) -> impl IntoResponse {
-    // TODO: Implement proper block logs retrieval
-    Json(serde_json::json!({
-        "logs": [],
-        "total": 0
-    }))
+    let limit = query.limit.unwrap_or(50).min(1000);
+    let offset = query.offset.unwrap_or(0);
+
+    match api::get_block_logs(state.database.as_ref(), limit, offset).await {
+        Ok(response) => (StatusCode::OK, Json(response)),
+        Err(e) => {
+            tracing::error!(error = %e, "Failed to get block logs");
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(api::BlockLogsResponse {
+                    logs: vec![],
+                    total: 0,
+                }),
+            )
+        }
+    }
 }
 
 /// Security sources status API handler
 async fn api_security_sources_handler<D: Database + 'static>(
     State(state): State<AppState<D>>,
 ) -> impl IntoResponse {
-    let sources: Vec<serde_json::Value> = state
-        .security_plugins
-        .iter()
-        .map(|p| {
-            let status = p.sync_status();
-            serde_json::json!({
-                "name": p.name(),
-                "ecosystems": p.supported_ecosystems(),
-                "last_sync": status.last_sync_at,
-                "status": status.status.to_string(),
-                "records_count": status.records_count
-            })
-        })
-        .collect();
-
-    Json(serde_json::json!({ "sources": sources }))
+    let response = api::build_security_sources_response(&state.security_plugins);
+    Json(response)
 }
 
 /// Trigger sync for a security source
@@ -239,49 +238,30 @@ async fn api_trigger_sync_handler<D: Database + 'static>(
 async fn api_cache_stats_handler<D: Database + 'static>(
     State(state): State<AppState<D>>,
 ) -> impl IntoResponse {
-    if let Some(cache) = &state.cache_plugin {
-        let stats = cache.stats().await;
-        Json(serde_json::json!({
-            "plugin": cache.name(),
-            "hits": stats.hits,
-            "misses": stats.misses,
-            "total_size_bytes": stats.total_size_bytes,
-            "entries": stats.entries
-        }))
-    } else {
-        Json(serde_json::json!({
-            "plugin": "none",
-            "hits": 0,
-            "misses": 0,
-            "total_size_bytes": 0,
-            "entries": 0
-        }))
-    }
+    let stats = api::get_cache_stats(&state.cache_plugin).await;
+    Json(stats)
 }
 
 /// Cache clear API handler
 async fn api_cache_clear_handler<D: Database + 'static>(
     State(state): State<AppState<D>>,
 ) -> impl IntoResponse {
-    if let Some(cache) = &state.cache_plugin {
-        match cache.purge().await {
-            Ok(_) => (
-                StatusCode::OK,
-                Json(serde_json::json!({ "message": "Cache cleared" })),
-            ),
-            Err(e) => {
-                tracing::error!(error = %e, "Failed to clear cache");
-                (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(serde_json::json!({ "error": "Failed to clear cache" })),
-                )
-            }
-        }
-    } else {
-        (
+    match api::clear_cache(&state.cache_plugin).await {
+        Ok(_) => (
             StatusCode::OK,
-            Json(serde_json::json!({ "message": "No cache configured" })),
-        )
+            Json(api::CacheClearResponse {
+                message: "Cache cleared".to_string(),
+            }),
+        ),
+        Err(e) => {
+            tracing::error!(error = %e, "Failed to clear cache");
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(api::CacheClearResponse {
+                    message: format!("Failed to clear cache: {}", e),
+                }),
+            )
+        }
     }
 }
 
@@ -506,21 +486,12 @@ async fn api_delete_token_handler<D: Database + 'static>(
 
 /// Web UI index handler
 async fn webui_index_handler() -> impl IntoResponse {
-    // TODO: Serve embedded index.html
-    (
-        StatusCode::OK,
-        [(axum::http::header::CONTENT_TYPE, "text/html")],
-        "<html><body><h1>Registry Firewall Web UI</h1><p>Coming soon...</p></body></html>",
-    )
+    crate::webui::serve_index()
 }
 
 /// Web UI static file handler
 async fn webui_static_handler(Path(path): Path<String>) -> impl IntoResponse {
-    // TODO: Serve embedded static files
-    (
-        StatusCode::NOT_FOUND,
-        format!("Static file not found: {}", path),
-    )
+    crate::webui::serve_static(&path)
 }
 
 #[cfg(test)]
@@ -535,6 +506,9 @@ mod tests {
         // Set up default expectations
         mock_db.expect_list_tokens().returning(|| Ok(vec![]));
         mock_db.expect_list_rules().returning(|| Ok(vec![]));
+        // For dashboard and blocks endpoints
+        mock_db.expect_get_block_logs_count().returning(|| Ok(0));
+        mock_db.expect_get_block_logs().returning(|_, _| Ok(vec![]));
 
         let db = Arc::new(mock_db);
         // Disable auth for router tests (auth middleware is tested separately)

@@ -9,6 +9,7 @@
 use axum::{
     extract::{Path, State},
     http::StatusCode,
+    middleware,
     response::{IntoResponse, Json},
     routing::{any, delete, get, post, put},
     Router,
@@ -21,6 +22,7 @@ use crate::database::Database;
 use crate::plugins::cache::traits::CachePlugin;
 use crate::plugins::registry::RegistryPlugin;
 use crate::plugins::security::traits::SecuritySourcePlugin;
+use crate::server::middleware::auth_middleware;
 
 /// Shared application state
 pub struct AppState<D: Database> {
@@ -78,6 +80,8 @@ pub struct MetricsResponse {
 ///
 /// An axum Router configured with all endpoints
 pub fn build_router<D: Database + 'static>(state: AppState<D>) -> Router {
+    let auth_manager = Arc::clone(&state.auth_manager);
+
     Router::new()
         // Health and metrics endpoints (no auth required)
         .route("/health", get(health_handler))
@@ -111,6 +115,11 @@ pub fn build_router<D: Database + 'static>(state: AppState<D>) -> Router {
         // Web UI routes
         .route("/ui", get(webui_index_handler))
         .route("/ui/*path", get(webui_static_handler))
+        // Apply authentication middleware
+        .layer(middleware::from_fn_with_state(
+            auth_manager,
+            auth_middleware,
+        ))
         .with_state(state)
 }
 
@@ -528,7 +537,11 @@ mod tests {
         mock_db.expect_list_rules().returning(|| Ok(vec![]));
 
         let db = Arc::new(mock_db);
-        let auth_config = AuthConfig::default();
+        // Disable auth for router tests (auth middleware is tested separately)
+        let auth_config = AuthConfig {
+            enabled: false,
+            ..Default::default()
+        };
         let auth_manager = Arc::new(AuthManager::new(Arc::clone(&db), auth_config));
 
         AppState {

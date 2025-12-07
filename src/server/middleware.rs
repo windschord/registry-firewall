@@ -71,7 +71,7 @@ pub struct AuthenticatedClient(pub Client);
 /// 4. Adds the authenticated client to the request extensions
 pub async fn auth_middleware<D: Database + 'static>(
     State(auth_manager): State<Arc<AuthManager<D>>>,
-    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    connect_info: Option<ConnectInfo<SocketAddr>>,
     mut request: Request,
     next: Next,
 ) -> Result<Response, AuthResponse> {
@@ -87,8 +87,8 @@ pub async fn auth_middleware<D: Database + 'static>(
         return Ok(next.run(request).await);
     }
 
-    // Get client IP for rate limiting
-    let client_ip = Some(addr.ip());
+    // Get client IP for rate limiting (optional, may not be available in some contexts)
+    let client_ip = connect_info.map(|ci| ci.0.ip());
 
     // Get authorization header
     let auth_header = request

@@ -32,7 +32,7 @@ pub struct AppState<D: Database> {
     /// Database
     pub database: Arc<D>,
 
-    /// Registry plugins by name
+    /// Registry plugins
     pub registry_plugins: Vec<Arc<dyn RegistryPlugin>>,
 
     /// Security plugins

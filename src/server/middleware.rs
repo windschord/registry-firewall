@@ -116,7 +116,8 @@ pub async fn auth_middleware<D: Database + 'static>(
             let decoded_str =
                 String::from_utf8(decoded).map_err(|_| AuthResponse::invalid_credentials())?;
             let parts: Vec<&str> = decoded_str.splitn(2, ':').collect();
-            if parts.len() != 2 {
+            // Check for valid username:password format (username cannot be empty)
+            if parts.len() != 2 || parts[0].is_empty() {
                 return Err(AuthResponse::invalid_credentials());
             }
             auth_manager

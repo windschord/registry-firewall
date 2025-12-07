@@ -152,7 +152,7 @@ mod tests {
         assert_eq!(server.bind_addr().unwrap().to_string(), "127.0.0.1:9090");
     }
 
-    // Test 2b: Invalid host address returns error
+    // Test 3: Invalid host address returns error
     #[test]
     fn test_server_bind_addr_invalid_host() {
         let config = ServerConfig {
@@ -170,7 +170,7 @@ mod tests {
             .contains("Invalid host address"));
     }
 
-    // Test 3: Server graceful shutdown
+    // Test 4: Server graceful shutdown
     #[tokio::test]
     async fn test_server_graceful_shutdown() {
         let config = ServerConfig {
@@ -194,7 +194,7 @@ mod tests {
         assert!(result.is_ok());
     }
 
-    // Test 4: ServerError display messages
+    // Test 5: ServerError display messages
     #[test]
     fn test_server_error_display() {
         let bind_err = ServerError::Bind("address in use".to_string());

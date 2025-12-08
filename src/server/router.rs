@@ -378,11 +378,55 @@ async fn api_get_rule_handler<D: Database + 'static>(
 }
 
 /// Update custom rule handler
+///
+/// Validates rule fields before update:
+/// - package_pattern: required, max 512 characters
+/// - version_constraint: optional, max 512 characters
+/// - reason: optional, max 1024 characters
 async fn api_update_rule_handler<D: Database + 'static>(
     State(state): State<AppState<D>>,
     Path(id): Path<i64>,
     Json(mut rule): Json<crate::models::CustomRule>,
 ) -> impl IntoResponse {
+    // Validate package_pattern
+    if rule.package_pattern.is_empty() {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({ "error": "Package pattern cannot be empty" })),
+        );
+    }
+    if rule.package_pattern.len() > MAX_PATTERN_LENGTH {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({ "error": "Package pattern exceeds maximum length" })),
+        );
+    }
+
+    // Validate version_constraint
+    if rule.version_constraint.len() > MAX_PATTERN_LENGTH {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({ "error": "Version constraint exceeds maximum length" })),
+        );
+    }
+
+    // Validate reason if provided
+    if let Some(ref reason) = rule.reason {
+        if reason.len() > MAX_REASON_LENGTH {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::json!({ "error": "Reason exceeds maximum length" })),
+            );
+        }
+    }
+
+    tracing::info!(
+        rule_id = id,
+        ecosystem = %rule.ecosystem,
+        package = %rule.package_pattern,
+        "Updating custom block rule"
+    );
+
     rule.id = Some(id);
     match state.database.update_rule(&rule).await {
         Ok(_) => (

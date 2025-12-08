@@ -134,19 +134,112 @@ cargo clippy
 
 ### API Endpoints
 
+All API endpoints (except `/health` and `/metrics`) require authentication via Bearer token or Basic auth.
+
+#### Public Endpoints (No Auth)
+
 | Endpoint | Description |
 |----------|-------------|
-| `GET /health` | Health check (no auth required) |
+| `GET /health` | Health check - returns `{"status": "healthy", "version": "x.x.x"}` |
 | `GET /metrics` | Prometheus metrics |
-| `GET /ui/*` | Web UI static files |
-| `GET /api/dashboard` | Dashboard statistics |
-| `GET /api/blocks` | Block event logs |
-| `GET /api/security-sources` | Security source status |
-| `POST /api/security-sources/{name}/sync` | Trigger manual sync |
-| `GET /api/cache/stats` | Cache statistics |
-| `DELETE /api/cache` | Clear cache |
-| `GET/POST/PUT/DELETE /api/rules` | Custom block rules |
-| `GET/POST/DELETE /api/tokens` | API token management |
+
+#### Dashboard & Logs
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/dashboard` | GET | Dashboard statistics (blocked counts, sync status) |
+| `/api/blocks` | GET | Block event logs with pagination |
+
+**GET /api/blocks Query Parameters:**
+- `limit` (optional): Number of logs to return (default: 50, max: 1000)
+- `offset` (optional): Pagination offset (default: 0)
+
+#### Security Sources
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/security-sources` | GET | List all security sources with sync status |
+| `/api/security-sources/{name}/sync` | POST | Trigger manual sync for a source |
+
+#### Cache Management
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/cache/stats` | GET | Cache statistics (hit rate, size) |
+| `/api/cache` | DELETE | Clear all cached data (returns 200) |
+
+#### Custom Block Rules
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/rules` | GET | List all custom block rules |
+| `/api/rules` | POST | Create a new rule (returns 201) |
+| `/api/rules/{id}` | GET | Get a specific rule |
+| `/api/rules/{id}` | PUT | Update a rule |
+| `/api/rules/{id}` | DELETE | Delete a rule (returns 204) |
+
+**Rule Schema:**
+```json
+{
+  "ecosystem": "pypi",
+  "package_pattern": "malicious-*",
+  "version_constraint": "*",
+  "reason": "Known malware pattern"
+}
+```
+
+**Validation:**
+- `package_pattern`: Required, max 512 characters
+- `version_constraint`: Optional, max 512 characters
+- `reason`: Optional, max 1024 characters
+
+#### API Tokens
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/tokens` | GET | List all active tokens (masked) |
+| `/api/tokens` | POST | Create a new token (returns 201) |
+| `/api/tokens/{id}` | DELETE | Revoke a token (returns 204) |
+
+**Create Token Request:**
+```json
+{
+  "name": "my-ci-token",
+  "allowed_ecosystems": ["pypi", "cargo"],
+  "expires_at": "2025-12-31T23:59:59Z"
+}
+```
+
+**Create Token Response:**
+```json
+{
+  "id": "abc123",
+  "name": "my-ci-token",
+  "token": "rf_xxxxxxxxxxxxxxxxxxxxxxxx",
+  "created_at": "2024-01-01T00:00:00Z",
+  "expires_at": "2025-12-31T23:59:59Z"
+}
+```
+
+> **Security Note:** The full token value is only returned once at creation. Subsequent list operations show only a masked prefix (e.g., `rf_abc1***`).
+
+#### Error Responses
+
+All errors return JSON with an `error` field:
+
+| Status Code | Description |
+|-------------|-------------|
+| 400 | Bad Request - Invalid input (validation error) |
+| 401 | Unauthorized - Missing or invalid authentication |
+| 404 | Not Found - Resource does not exist |
+| 429 | Too Many Requests - Rate limited |
+| 500 | Internal Server Error - Server-side error |
+
+```json
+{
+  "error": "Package pattern cannot be empty"
+}
+```
 
 ## Configuration
 

@@ -30,26 +30,50 @@ pub fn get_static_file(path: &str) -> Option<StaticFile> {
         path.trim_start_matches('/')
     };
 
-    Assets::get(path).map(|content| StaticFile {
-        content: content.data.into_owned(),
-        mime_type: mime_guess::from_path(path)
-            .first_or_octet_stream()
-            .to_string(),
+    Assets::get(path).map(|content| {
+        let data = content.data.into_owned();
+        // Generate ETag from content length and path (simple but effective for static assets)
+        let etag = format!("\"{:x}-{}\"", data.len(), path.len());
+        StaticFile {
+            content: data,
+            mime_type: mime_guess::from_path(path)
+                .first_or_octet_stream()
+                .to_string(),
+            etag,
+            is_immutable: is_immutable_asset(path),
+        }
     })
 }
 
-/// A static file with content and MIME type
+/// Check if an asset is immutable (has content hash in filename)
+fn is_immutable_asset(path: &str) -> bool {
+    // Vite generates filenames like index-Cz5_SEy9.js with content hashes
+    path.contains("assets/") && (path.ends_with(".js") || path.ends_with(".css"))
+}
+
+/// A static file with content, MIME type, and caching metadata
 pub struct StaticFile {
     pub content: Vec<u8>,
     pub mime_type: String,
+    pub etag: String,
+    pub is_immutable: bool,
 }
 
 impl IntoResponse for StaticFile {
     fn into_response(self) -> Response {
+        // Immutable assets (with content hash in filename) can be cached for 1 year
+        // Other assets (like index.html) should be revalidated more often
+        let cache_control = if self.is_immutable {
+            "public, max-age=31536000, immutable"
+        } else {
+            "public, max-age=3600, must-revalidate"
+        };
+
         Response::builder()
             .status(StatusCode::OK)
-            .header(header::CONTENT_TYPE, self.mime_type)
-            .header(header::CACHE_CONTROL, "public, max-age=3600")
+            .header(header::CONTENT_TYPE, &self.mime_type)
+            .header(header::CACHE_CONTROL, cache_control)
+            .header(header::ETAG, &self.etag)
             .body(Body::from(self.content))
             .unwrap()
     }
@@ -108,9 +132,24 @@ mod tests {
         let file = StaticFile {
             content: b"Hello, World!".to_vec(),
             mime_type: "text/plain".to_string(),
+            etag: "\"abc123\"".to_string(),
+            is_immutable: false,
         };
         let response = file.into_response();
         assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    // Test: is_immutable_asset correctly identifies immutable assets
+    #[test]
+    fn test_is_immutable_asset() {
+        // Immutable (Vite-generated with content hash)
+        assert!(is_immutable_asset("assets/index-Cz5_SEy9.js"));
+        assert!(is_immutable_asset("assets/index-DW6bRwcH.css"));
+
+        // Not immutable
+        assert!(!is_immutable_asset("index.html"));
+        assert!(!is_immutable_asset("favicon.ico"));
+        assert!(!is_immutable_asset("app.js")); // No assets/ prefix
     }
 
     // Test 4: serve_static returns 404 for missing asset files

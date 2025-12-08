@@ -30,6 +30,7 @@ const mockTokens: api.TokensResponse = {
     {
       id: 'token-1',
       name: 'CI Pipeline',
+      token_prefix: 'rf_token-1***',
       created_at: '2024-01-15T10:00:00Z',
       expires_at: '2025-01-15T10:00:00Z',
       last_used_at: null,
@@ -38,6 +39,7 @@ const mockTokens: api.TokensResponse = {
     {
       id: 'token-2',
       name: 'Dev Token',
+      token_prefix: 'rf_token-2***',
       created_at: '2024-01-10T10:00:00Z',
       expires_at: null,
       last_used_at: '2024-01-14T10:00:00Z',

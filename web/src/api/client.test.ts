@@ -198,19 +198,17 @@ describe('API Client', () => {
 
   describe('deleteRule', () => {
     it('deletes a rule', async () => {
-      const mockData = { message: 'Rule deleted' }
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve(mockData),
+        status: 204,
       })
 
-      const result = await deleteRule(1)
+      await deleteRule(1)
 
       expect(mockFetch).toHaveBeenCalledWith('/api/rules/1', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
       })
-      expect(result).toEqual(mockData)
     })
   })
 
@@ -267,19 +265,17 @@ describe('API Client', () => {
 
   describe('revokeToken', () => {
     it('revokes a token', async () => {
-      const mockData = { message: 'Token revoked' }
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve(mockData),
+        status: 204,
       })
 
-      const result = await revokeToken('token-id')
+      await revokeToken('token-id')
 
       expect(mockFetch).toHaveBeenCalledWith('/api/tokens/token-id', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
       })
-      expect(result).toEqual(mockData)
     })
   })
 })

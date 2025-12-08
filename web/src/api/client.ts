@@ -15,6 +15,11 @@ async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> 
     throw new Error(`API error: ${response.status} ${response.statusText}`)
   }
 
+  // Handle 204 No Content responses
+  if (response.status === 204) {
+    return undefined as T
+  }
+
   return response.json()
 }
 
@@ -87,6 +92,7 @@ export interface RulesResponse {
 export interface TokenInfo {
   id: string
   name: string
+  token_prefix: string
   created_at: string
   expires_at: string | null
   last_used_at: string | null
@@ -137,8 +143,8 @@ export async function createRule(rule: Omit<CustomRule, 'id'>): Promise<{ id: nu
   })
 }
 
-export async function deleteRule(id: number): Promise<{ message: string }> {
-  return fetchApi<{ message: string }>(`/rules/${id}`, {
+export async function deleteRule(id: number): Promise<void> {
+  await fetchApi<void>(`/rules/${id}`, {
     method: 'DELETE',
   })
 }
@@ -154,8 +160,8 @@ export async function createToken(name: string, ecosystems?: string[]): Promise<
   })
 }
 
-export async function revokeToken(id: string): Promise<{ message: string }> {
-  return fetchApi<{ message: string }>(`/tokens/${id}`, {
+export async function revokeToken(id: string): Promise<void> {
+  await fetchApi<void>(`/tokens/${id}`, {
     method: 'DELETE',
   })
 }

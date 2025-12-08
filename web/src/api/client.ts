@@ -76,10 +76,8 @@ export interface CustomRule {
   id?: number
   ecosystem: string
   package_pattern: string
-  version_pattern: string
+  version_constraint: string
   reason?: string
-  enabled: boolean
-  created_at?: string
 }
 
 export interface RulesResponse {
@@ -132,7 +130,7 @@ export async function getRules(): Promise<RulesResponse> {
   return fetchApi<RulesResponse>('/rules')
 }
 
-export async function createRule(rule: Omit<CustomRule, 'id' | 'created_at'>): Promise<{ id: number }> {
+export async function createRule(rule: Omit<CustomRule, 'id'>): Promise<{ id: number }> {
   return fetchApi<{ id: number }>('/rules', {
     method: 'POST',
     body: JSON.stringify(rule),

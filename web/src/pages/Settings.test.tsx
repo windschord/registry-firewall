@@ -19,10 +19,8 @@ const mockRules: api.RulesResponse = {
       id: 1,
       ecosystem: 'pypi',
       package_pattern: 'malicious-*',
-      version_pattern: '*',
+      version_constraint: '*',
       reason: 'Known malware pattern',
-      enabled: true,
-      created_at: '2024-01-15T10:00:00Z',
     },
   ],
 }
@@ -329,9 +327,7 @@ describe('Settings', () => {
             id: 1,
             ecosystem: 'pypi',
             package_pattern: 'test-*',
-            version_pattern: '*',
-            enabled: true,
-            created_at: '2024-01-15T10:00:00Z',
+            version_constraint: '*',
           },
         ],
       })

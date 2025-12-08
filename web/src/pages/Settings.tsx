@@ -118,7 +118,7 @@ function RulesSection() {
   const [newRule, setNewRule] = useState({
     ecosystem: 'pypi',
     package_pattern: '',
-    version_pattern: '*',
+    version_constraint: '*',
     reason: '',
   })
 
@@ -144,12 +144,11 @@ function RulesSection() {
       await createRule({
         ecosystem: newRule.ecosystem,
         package_pattern: newRule.package_pattern,
-        version_pattern: newRule.version_pattern,
+        version_constraint: newRule.version_constraint,
         reason: newRule.reason || undefined,
-        enabled: true,
       })
       setShowForm(false)
-      setNewRule({ ecosystem: 'pypi', package_pattern: '', version_pattern: '*', reason: '' })
+      setNewRule({ ecosystem: 'pypi', package_pattern: '', version_constraint: '*', reason: '' })
       fetchRules()
     } catch (err) {
       alert(`Failed to create rule: ${err instanceof Error ? err.message : 'Unknown error'}`)
@@ -214,8 +213,8 @@ function RulesSection() {
               <input
                 id="rule-version"
                 type="text"
-                value={newRule.version_pattern}
-                onChange={e => setNewRule({ ...newRule, version_pattern: e.target.value })}
+                value={newRule.version_constraint}
+                onChange={e => setNewRule({ ...newRule, version_constraint: e.target.value })}
                 placeholder="e.g., * or >=1.0.0"
                 className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
@@ -272,7 +271,7 @@ function RulesSection() {
               <tr key={rule.id}>
                 <td className="px-4 py-2 text-sm">{rule.ecosystem}</td>
                 <td className="px-4 py-2 text-sm font-mono">{rule.package_pattern}</td>
-                <td className="px-4 py-2 text-sm font-mono">{rule.version_pattern}</td>
+                <td className="px-4 py-2 text-sm font-mono">{rule.version_constraint}</td>
                 <td className="px-4 py-2 text-sm text-gray-500">{rule.reason || '-'}</td>
                 <td className="px-4 py-2">
                   <button

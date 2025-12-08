@@ -183,8 +183,7 @@ describe('API Client', () => {
       const rule = {
         ecosystem: 'pypi',
         package_pattern: 'malicious-*',
-        version_pattern: '*',
-        enabled: true,
+        version_constraint: '*',
       }
       const result = await createRule(rule)
 

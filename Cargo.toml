@@ -55,6 +55,7 @@ url = "2"
 
 # Embed static files
 rust-embed = "8"
+mime_guess = "2"
 
 # Git operations (for OpenSSF sync)
 git2 = "0.18"

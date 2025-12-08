@@ -205,7 +205,10 @@ async fn api_blocks_handler<D: Database + 'static>(
     Query(query): Query<BlockLogsQuery>,
 ) -> impl IntoResponse {
     // Validate and apply limits using constants
-    let limit = query.limit.unwrap_or(DEFAULT_PAGE_LIMIT).min(MAX_PAGE_LIMIT);
+    let limit = query
+        .limit
+        .unwrap_or(DEFAULT_PAGE_LIMIT)
+        .min(MAX_PAGE_LIMIT);
     let offset = query.offset.unwrap_or(0);
 
     match api::get_block_logs(state.database.as_ref(), limit, offset).await {

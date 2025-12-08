@@ -236,7 +236,10 @@ pub struct TokenInfo {
 impl From<&Token> for TokenInfo {
     fn from(token: &Token) -> Self {
         // Create masked token prefix from ID (tokens start with rf_)
-        let prefix = format!("rf_{}***", &token.id[..TOKEN_MASK_PREFIX_LENGTH.min(token.id.len())]);
+        let prefix = format!(
+            "rf_{}***",
+            &token.id[..TOKEN_MASK_PREFIX_LENGTH.min(token.id.len())]
+        );
         Self {
             id: token.id.clone(),
             name: token.name.clone(),

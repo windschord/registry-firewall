@@ -5,14 +5,11 @@
 //! - Manual sync triggering
 //! - Status tracking
 
-mod common;
-
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use common::*;
 use registry_firewall::error::SyncError;
 use registry_firewall::sync::scheduler::{SchedulerConfig, SyncResult, SyncScheduler, Syncable};
 use tokio::sync::broadcast;

@@ -1,5 +1,7 @@
 //! Common test utilities and helpers for integration tests
 
+#![allow(dead_code)]
+
 use std::sync::Arc;
 
 use registry_firewall::auth::{AuthConfig, AuthManager, RateLimitConfig};

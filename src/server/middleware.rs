@@ -510,16 +510,14 @@ mod tests {
     #[test]
     fn test_logging_layer_new() {
         let _layer = LoggingLayer::new();
-        let _layer2 = LoggingLayer::default();
-        // Just verify they can be created
+        // Just verify it can be created
     }
 
     // Test 8: TracingLayer can be created
     #[test]
     fn test_tracing_layer_new() {
         let _layer = TracingLayer::new();
-        let _layer2 = TracingLayer::default();
-        // Just verify they can be created
+        // Just verify it can be created
     }
 
     // Test 9: Auth skip paths work correctly

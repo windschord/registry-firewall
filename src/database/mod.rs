@@ -5,6 +5,8 @@
 pub mod migrations;
 pub mod sqlite;
 
+pub use sqlite::SqliteDatabase;
+
 use async_trait::async_trait;
 
 use crate::error::DbError;

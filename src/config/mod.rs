@@ -188,6 +188,10 @@ pub struct AuthRateLimitConfig {
     /// Duration to block after max failures (in seconds)
     #[serde(default = "default_block_duration")]
     pub block_duration_secs: u64,
+
+    /// Window duration for tracking failures (in seconds)
+    #[serde(default = "default_window_duration")]
+    pub window_duration_secs: u64,
 }
 
 impl Default for AuthRateLimitConfig {
@@ -195,6 +199,7 @@ impl Default for AuthRateLimitConfig {
         Self {
             max_failures: default_max_failures(),
             block_duration_secs: default_block_duration(),
+            window_duration_secs: default_window_duration(),
         }
     }
 }
@@ -205,6 +210,10 @@ fn default_max_failures() -> u32 {
 
 fn default_block_duration() -> u64 {
     300
+}
+
+fn default_window_duration() -> u64 {
+    600
 }
 
 /// Registry plugin configuration

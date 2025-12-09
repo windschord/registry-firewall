@@ -8,12 +8,7 @@ global:
 
 scrape_configs:
   # OpenTelemetry Collector metrics endpoint
+  # The collector exports metrics from registry-firewall via OTLP
   - job_name: 'otel-collector'
     static_configs:
       - targets: ['otel-collector:8889']
-
-  # Registry Firewall metrics (if exposed directly)
-  - job_name: 'registry-firewall'
-    static_configs:
-      - targets: ['registry-firewall:8080']
-    metrics_path: /metrics

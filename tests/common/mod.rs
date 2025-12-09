@@ -98,8 +98,8 @@ pub async fn run_test_server(
             .expect("Server error");
     });
 
-    // Give the server a moment to start
-    tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+    // Give the server a moment to start (100ms is sufficient for slow CI systems)
+    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
 
     (addr, shutdown_tx)
 }

@@ -19,6 +19,7 @@ auth:
   rate_limit:
     max_failures: 5
     block_duration_secs: 300
+    window_duration_secs: 600
 
 database:
   path: "/data/db/registry-firewall.db"

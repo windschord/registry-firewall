@@ -10,30 +10,9 @@ mod common;
 use std::sync::Arc;
 
 use common::*;
-#[allow(unused_imports)]
-use registry_firewall::auth::{
-    generate_token, hash_token, AuthConfig, AuthManager, RateLimitConfig,
-};
-use registry_firewall::database::SqliteDatabase;
+use registry_firewall::auth::{hash_token, AuthConfig, AuthManager, RateLimitConfig};
 use registry_firewall::models::CreateTokenRequest;
-use registry_firewall::server::AppState;
 use reqwest::StatusCode;
-
-/// Create a test state with authentication enabled
-#[allow(dead_code)]
-async fn create_auth_enabled_state() -> AppState<SqliteDatabase> {
-    let database = create_test_database().await;
-    let password_hash = hash_token("admin_password").expect("Failed to hash password");
-    let auth_manager = create_test_auth_manager_with_auth(Arc::clone(&database), &password_hash);
-
-    AppState {
-        auth_manager,
-        database,
-        registry_plugins: vec![],
-        security_plugins: vec![],
-        cache_plugin: None,
-    }
-}
 
 /// Test 1: Token creation through AuthManager
 #[tokio::test]

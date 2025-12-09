@@ -6,7 +6,6 @@ use std::sync::Arc;
 
 use clap::Parser;
 use tokio::signal;
-use tokio::sync::broadcast;
 use tracing::{error, info};
 
 use registry_firewall::auth::{AuthConfig, AuthManager, RateLimitConfig};
@@ -59,7 +58,7 @@ async fn main() -> anyhow::Result<()> {
                 config.auth.rate_limit.block_duration_secs,
             ),
             window_duration: std::time::Duration::from_secs(
-                config.auth.rate_limit.block_duration_secs * 2,
+                config.auth.rate_limit.window_duration_secs,
             ),
         },
     };
@@ -68,9 +67,6 @@ async fn main() -> anyhow::Result<()> {
         auth_enabled = config.auth.enabled,
         "Authentication manager initialized"
     );
-
-    // Create shutdown broadcast channel
-    let (shutdown_tx, _shutdown_rx) = broadcast::channel::<()>(1);
 
     // Create application state
     let state = AppState {
@@ -94,9 +90,6 @@ async fn main() -> anyhow::Result<()> {
     // Run the server
     let result = server.run(shutdown_signal).await;
 
-    // Signal shutdown to all background tasks
-    let _ = shutdown_tx.send(());
-
     // Shutdown OpenTelemetry
     if let Err(e) = otel_provider.shutdown() {
         error!(error = %e, "Failed to shutdown OpenTelemetry");
@@ -111,11 +104,11 @@ async fn main() -> anyhow::Result<()> {
 fn load_config(args: &Args) -> anyhow::Result<Config> {
     match &args.config {
         Some(path) => {
-            info!(path = %path, "Loading configuration from file");
+            eprintln!("Loading configuration from file: {}", path);
             Config::from_file(path).map_err(|e| anyhow::anyhow!("Failed to load config: {}", e))
         }
         None => {
-            info!("Loading configuration from environment variables");
+            eprintln!("Loading configuration from environment variables");
             Config::from_env().map_err(|e| anyhow::anyhow!("Failed to load config: {}", e))
         }
     }

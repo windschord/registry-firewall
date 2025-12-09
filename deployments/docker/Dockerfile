@@ -77,7 +77,7 @@ EXPOSE 8080
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD ["/usr/local/bin/registry-firewall", "--help"] || exit 1
+    CMD /usr/local/bin/registry-firewall --help || exit 1
 
 # Environment variables
 ENV REGISTRY_FIREWALL_CONFIG=/config/config.yaml \

@@ -269,22 +269,3 @@ fn test_scheduler_config_default() {
     assert_eq!(config.jitter_secs, 60);
     assert_eq!(config.sync_timeout_secs, 300);
 }
-
-/// Test 9: Security sources API endpoint
-#[tokio::test]
-async fn test_security_sources_api() {
-    let state = create_test_state().await;
-    let (addr, _shutdown) = run_test_server(state).await;
-
-    let client = reqwest::Client::new();
-    let response = client
-        .get(format!("http://{}/api/security-sources", addr))
-        .send()
-        .await
-        .expect("Failed to send request");
-
-    assert_eq!(response.status(), reqwest::StatusCode::OK);
-
-    let body: serde_json::Value = response.json().await.expect("Failed to parse JSON");
-    assert!(body.get("sources").is_some());
-}

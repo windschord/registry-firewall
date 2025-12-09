@@ -8,7 +8,7 @@
 # ==============================================================================
 # Stage 1: Build the Rust application
 # ==============================================================================
-FROM rust:1.75-bookworm AS builder
+FROM rust:1-bookworm AS builder
 
 WORKDIR /app
 
@@ -75,7 +75,7 @@ WORKDIR /home/regfw
 # Expose HTTP port
 EXPOSE 8080
 
-# Health check
+# Health check - use shell form to support || operator
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD /usr/local/bin/registry-firewall --help || exit 1
 

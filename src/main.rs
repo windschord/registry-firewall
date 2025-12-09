@@ -104,10 +104,12 @@ async fn main() -> anyhow::Result<()> {
 fn load_config(args: &Args) -> anyhow::Result<Config> {
     match &args.config {
         Some(path) => {
+            // Use eprintln! since tracing is not yet initialized
             eprintln!("Loading configuration from file: {}", path);
             Config::from_file(path).map_err(|e| anyhow::anyhow!("Failed to load config: {}", e))
         }
         None => {
+            // Use eprintln! since tracing is not yet initialized
             eprintln!("Loading configuration from environment variables");
             Config::from_env().map_err(|e| anyhow::anyhow!("Failed to load config: {}", e))
         }

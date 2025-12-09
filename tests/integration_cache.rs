@@ -54,9 +54,12 @@ async fn test_cache_stats_no_cache() {
     assert_eq!(response.status(), StatusCode::OK);
 
     let body: serde_json::Value = response.json().await.expect("Failed to parse JSON");
-    // API returns total_size_bytes and entries
-    assert!(body.get("total_size_bytes").is_some() || body.get("total_size").is_some());
-    assert!(body.get("entries").is_some() || body.get("entry_count").is_some());
+    // API uses total_size_bytes and entries as field names
+    assert!(
+        body.get("total_size_bytes").is_some(),
+        "Expected total_size_bytes field"
+    );
+    assert!(body.get("entries").is_some(), "Expected entries field");
 }
 
 /// Test 2: Filesystem cache stores and retrieves data

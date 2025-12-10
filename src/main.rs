@@ -12,6 +12,10 @@ use registry_firewall::auth::{AuthConfig, AuthManager, RateLimitConfig};
 use registry_firewall::config::Config;
 use registry_firewall::database::SqliteDatabase;
 use registry_firewall::otel::{init_tracing, OtelProvider};
+use registry_firewall::plugins::registry::pypi::{PyPIConfig, PyPIPlugin};
+use registry_firewall::plugins::registry::RegistryPlugin;
+use registry_firewall::plugins::security::custom::{CustomBlocklistConfig, CustomBlocklistPlugin};
+use registry_firewall::plugins::security::SecuritySourcePlugin;
 use registry_firewall::server::{AppState, Server};
 
 /// registry-firewall - A unified registry proxy for software supply chain security
@@ -68,12 +72,61 @@ async fn main() -> anyhow::Result<()> {
         "Authentication manager initialized"
     );
 
+    // Initialize registry plugins
+    let mut registry_plugins: Vec<Arc<dyn RegistryPlugin>> = vec![];
+
+    if let Some(pypi_cfg) = config.registry_plugins.get("pypi") {
+        if pypi_cfg.enabled {
+            let pypi_config = PyPIConfig {
+                upstream: pypi_cfg.upstream.clone(),
+                path_prefix: pypi_cfg.path_prefix.clone(),
+                cache_ttl_secs: pypi_cfg.cache_ttl_secs,
+            };
+            registry_plugins.push(Arc::new(PyPIPlugin::with_config(pypi_config)));
+            info!(
+                upstream = %pypi_cfg.upstream,
+                path_prefix = %pypi_cfg.path_prefix,
+                "PyPI registry plugin enabled"
+            );
+        }
+    }
+
+    // Initialize security plugins
+    let mut security_plugins: Vec<Arc<dyn SecuritySourcePlugin>> = vec![];
+
+    if let Some(custom_cfg) = config.security_plugins.get("custom") {
+        if custom_cfg.enabled {
+            // Get blocklist_path from options
+            if let Some(blocklist_path) = custom_cfg.options.get("blocklist_path") {
+                let custom_config = CustomBlocklistConfig {
+                    file_path: std::path::PathBuf::from(blocklist_path),
+                    ..Default::default()
+                };
+                let plugin = CustomBlocklistPlugin::new(custom_config);
+                // Load the blocklist rules
+                match plugin.sync().await {
+                    Ok(result) => {
+                        info!(
+                            blocklist_path = %blocklist_path,
+                            rules = result.records_updated,
+                            "Custom blocklist plugin enabled"
+                        );
+                    }
+                    Err(e) => {
+                        error!(error = %e, "Failed to load custom blocklist");
+                    }
+                }
+                security_plugins.push(Arc::new(plugin));
+            }
+        }
+    }
+
     // Create application state
     let state = AppState {
         auth_manager,
         database,
-        registry_plugins: vec![],
-        security_plugins: vec![],
+        registry_plugins,
+        security_plugins,
         cache_plugin: None,
     };
 

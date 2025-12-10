@@ -48,7 +48,7 @@ async fn test_metrics_endpoint() {
     assert!(body.get("requests_total").is_some());
 }
 
-/// Test 3: PyPI simple API route exists (returns NOT_IMPLEMENTED for now)
+/// Test 3: PyPI simple API route exists (returns NOT_FOUND when no plugin registered)
 #[tokio::test]
 async fn test_pypi_simple_route() {
     let state = create_test_state().await;
@@ -61,8 +61,8 @@ async fn test_pypi_simple_route() {
         .await
         .expect("Failed to send request");
 
-    // Currently returns NOT_IMPLEMENTED as proxy is not fully implemented
-    assert_eq!(response.status(), StatusCode::NOT_IMPLEMENTED);
+    // Returns NOT_FOUND when no matching plugin is registered
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
 }
 
 /// Test 4: PyPI packages route exists
@@ -81,8 +81,8 @@ async fn test_pypi_packages_route() {
         .await
         .expect("Failed to send request");
 
-    // Currently returns NOT_IMPLEMENTED as proxy is not fully implemented
-    assert_eq!(response.status(), StatusCode::NOT_IMPLEMENTED);
+    // Returns NOT_FOUND when no matching plugin is registered
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
 }
 
 /// Test 5: Dashboard API returns stats

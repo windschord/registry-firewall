@@ -3,7 +3,7 @@
 //! This module defines the axum router that handles all HTTP requests.
 //! It provides routes for:
 //! - Health checks and metrics
-//! - Registry proxies (PyPI, Go, Cargo, Docker)
+//! - Registry proxies (PyPI, Go, Cargo, npm, Docker)
 //! - Web UI and API endpoints
 
 use axum::{
@@ -94,6 +94,7 @@ pub fn build_router<D: Database + 'static>(state: AppState<D>) -> Router {
         .route("/pypi/*path", any(registry_proxy_handler::<D>))
         .route("/go/*path", any(registry_proxy_handler::<D>))
         .route("/cargo/*path", any(registry_proxy_handler::<D>))
+        .route("/npm/*path", any(registry_proxy_handler::<D>))
         .route("/v2/*path", any(registry_proxy_handler::<D>))
         // API routes
         .route("/api/dashboard", get(api_dashboard_handler::<D>))
@@ -758,6 +759,28 @@ mod tests {
         let server = TestServer::new(app).unwrap();
 
         let response = server.get("/v2/library/alpine/manifests/latest").await;
+        response.assert_status(StatusCode::NOT_FOUND);
+    }
+
+    // Test 6b: npm proxy route is routed (returns NOT_FOUND when no plugin registered)
+    #[tokio::test]
+    async fn test_npm_route_exists() {
+        let state = create_test_state();
+        let app = build_router(state);
+        let server = TestServer::new(app).unwrap();
+
+        let response = server.get("/npm/lodash").await;
+        response.assert_status(StatusCode::NOT_FOUND);
+    }
+
+    // Test 6c: npm scoped package route (returns NOT_FOUND when no plugin registered)
+    #[tokio::test]
+    async fn test_npm_scoped_route_exists() {
+        let state = create_test_state();
+        let app = build_router(state);
+        let server = TestServer::new(app).unwrap();
+
+        let response = server.get("/npm/@types/node").await;
         response.assert_status(StatusCode::NOT_FOUND);
     }
 

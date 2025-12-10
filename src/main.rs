@@ -12,6 +12,7 @@ use registry_firewall::auth::{AuthConfig, AuthManager, RateLimitConfig};
 use registry_firewall::config::Config;
 use registry_firewall::database::SqliteDatabase;
 use registry_firewall::otel::{init_tracing, OtelProvider};
+use registry_firewall::plugins::registry::npm::{NpmConfig, NpmPlugin};
 use registry_firewall::plugins::registry::pypi::{PyPIConfig, PyPIPlugin};
 use registry_firewall::plugins::registry::RegistryPlugin;
 use registry_firewall::plugins::security::custom::{CustomBlocklistConfig, CustomBlocklistPlugin};
@@ -87,6 +88,22 @@ async fn main() -> anyhow::Result<()> {
                 upstream = %pypi_cfg.upstream,
                 path_prefix = %pypi_cfg.path_prefix,
                 "PyPI registry plugin enabled"
+            );
+        }
+    }
+
+    if let Some(npm_cfg) = config.registry_plugins.get("npm") {
+        if npm_cfg.enabled {
+            let npm_config = NpmConfig {
+                upstream: npm_cfg.upstream.clone(),
+                path_prefix: npm_cfg.path_prefix.clone(),
+                cache_ttl_secs: npm_cfg.cache_ttl_secs,
+            };
+            registry_plugins.push(Arc::new(NpmPlugin::with_config(npm_config)));
+            info!(
+                upstream = %npm_cfg.upstream,
+                path_prefix = %npm_cfg.path_prefix,
+                "npm registry plugin enabled"
             );
         }
     }

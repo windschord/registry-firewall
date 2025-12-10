@@ -4,6 +4,7 @@
 //! - PyPI (Python Package Index)
 //! - Go Module Proxy
 //! - Cargo (Rust crates)
+//! - npm (Node Package Manager)
 //! - Docker Registry
 
 pub mod traits;
@@ -12,6 +13,7 @@ pub mod traits;
 pub mod cargo;
 pub mod docker;
 pub mod golang;
+pub mod npm;
 pub mod pypi;
 
 pub use traits::{RegistryPlugin, RegistryResponse, RequestContext};

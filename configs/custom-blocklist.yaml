@@ -1,0 +1,23 @@
+# Custom Blocklist Configuration
+#
+# This file defines custom blocking rules for packages.
+# These rules are applied in addition to security source data.
+
+rules: []
+# Example rules:
+#
+# rules:
+#   - ecosystem: "pypi"
+#     package_pattern: "malicious-package"
+#     version_constraint: "*"
+#     reason: "Known malicious package"
+#
+#   - ecosystem: "cargo"
+#     package_pattern: "backdoor-*"
+#     version_constraint: "*"
+#     reason: "Suspicious package naming pattern"
+#
+#   - ecosystem: "go"
+#     package_pattern: "github.com/evil/*"
+#     version_constraint: "*"
+#     reason: "Untrusted repository"

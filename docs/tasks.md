@@ -1107,15 +1107,15 @@ TDDで`src/webui/api.rs`にWeb UI用のAPIエンドポイントを実装する
 - `tracing_subscriber`でロギング初期化
 
 **受入基準**:
-- [ ] 設定ファイルパスがCLI引数または環境変数で指定可能
-- [ ] すべてのコンポーネントが初期化される
-- [ ] サーバーが起動する
-- [ ] SIGTERM/SIGINTでグレースフルシャットダウン
-- [ ] `cargo run`で起動できる
+- [x] 設定ファイルパスがCLI引数または環境変数で指定可能
+- [x] すべてのコンポーネントが初期化される
+- [x] サーバーが起動する
+- [x] SIGTERM/SIGINTでグレースフルシャットダウン
+- [x] `cargo run`で起動できる
 
 **依存関係**: フェーズ1-10のすべてのタスク
 **推定工数**: 30分
-**ステータス**: `TODO`
+**ステータス**: `DONE`
 
 #### タスク11.2: 統合テストの実装
 **説明**:
@@ -1133,16 +1133,16 @@ TDDで`src/webui/api.rs`にWeb UI用のAPIエンドポイントを実装する
 - テストサーバーを起動
 
 **受入基準**:
-- [ ] `tests/integration_pypi.rs`が存在する
-- [ ] `tests/integration_auth.rs`が存在する
-- [ ] `tests/integration_cache.rs`が存在する
-- [ ] `tests/integration_sync.rs`が存在する
-- [ ] 各ファイルに3つ以上のテストが存在する
-- [ ] `cargo test --test '*'`が通過する
+- [x] `tests/integration_pypi.rs`が存在する
+- [x] `tests/integration_auth.rs`が存在する
+- [x] `tests/integration_cache.rs`が存在する
+- [x] `tests/integration_sync.rs`が存在する
+- [x] 各ファイルに3つ以上のテストが存在する
+- [x] `cargo test --test '*'`が通過する
 
 **依存関係**: タスク11.1
 **推定工数**: 45分
-**ステータス**: `TODO`
+**ステータス**: `DONE`
 
 #### タスク11.3: Dockerfileの作成
 **説明**:
@@ -1159,15 +1159,15 @@ TDDで`src/webui/api.rs`にWeb UI用のAPIエンドポイントを実装する
 - 非rootユーザーで実行
 
 **受入基準**:
-- [ ] `Dockerfile`が存在する
-- [ ] マルチステージビルドが使用されている
-- [ ] 最終イメージサイズが100MB以下
-- [ ] `docker build`が成功する
-- [ ] `docker run`で起動できる
+- [x] `Dockerfile`が存在する
+- [x] マルチステージビルドが使用されている
+- [x] 最終イメージサイズが100MB以下
+- [x] `docker build`が成功する
+- [x] `docker run`で起動できる
 
 **依存関係**: タスク11.1
 **推定工数**: 25分
-**ステータス**: `TODO`
+**ステータス**: `DONE`
 
 #### タスク11.4: docker-compose.yamlの作成
 **説明**:
@@ -1184,15 +1184,15 @@ TDDで`src/webui/api.rs`にWeb UI用のAPIエンドポイントを実装する
 - 環境変数で設定をオーバーライド可能に
 
 **受入基準**:
-- [ ] `docker-compose.yaml`が存在する
-- [ ] registry-firewallサービスが定義されている
-- [ ] ボリュームマウントが設定されている
-- [ ] 環境変数が設定可能
-- [ ] `docker-compose up`で起動できる
+- [x] `docker-compose.yaml`が存在する
+- [x] registry-firewallサービスが定義されている
+- [x] ボリュームマウントが設定されている
+- [x] 環境変数が設定可能
+- [x] `docker-compose up`で起動できる
 
 **依存関係**: タスク11.3
 **推定工数**: 20分
-**ステータス**: `TODO`
+**ステータス**: `DONE`
 
 ---
 

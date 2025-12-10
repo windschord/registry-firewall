@@ -1,0 +1,71 @@
+# registry-firewall Configuration
+#
+# This is the default configuration file for registry-firewall.
+# Environment variables can be used with ${VAR_NAME} syntax.
+
+server:
+  host: "0.0.0.0"
+  port: 8080
+  request_timeout_secs: 30
+  shutdown_timeout_secs: 30
+
+logging:
+  level: "info"
+  format: "json"
+
+auth:
+  enabled: false
+  admin_password: null
+  rate_limit:
+    max_failures: 5
+    block_duration_secs: 300
+    window_duration_secs: 600
+
+database:
+  path: "/data/db/registry-firewall.db"
+
+cache:
+  enabled: true
+  plugin: "filesystem"
+  filesystem:
+    base_path: "/data/cache"
+    max_size_gb: 50
+
+registry_plugins:
+  pypi:
+    enabled: true
+    path_prefix: "/pypi"
+    upstream: "https://pypi.org"
+  go:
+    enabled: true
+    path_prefix: "/go"
+    upstream: "https://proxy.golang.org"
+  cargo:
+    enabled: true
+    path_prefix: "/cargo"
+    upstream: "https://index.crates.io"
+  docker:
+    enabled: true
+    path_prefix: "/v2"
+    upstream: "https://registry-1.docker.io"
+
+security_plugins:
+  osv:
+    enabled: true
+    sync_interval_secs: 3600
+    ecosystems:
+      - "pypi"
+      - "go"
+      - "cargo"
+  openssf:
+    enabled: true
+    sync_interval_secs: 3600
+  custom:
+    enabled: true
+    blocklist_path: "/config/custom-blocklist.yaml"
+
+otel:
+  enabled: false
+  endpoint: "http://localhost:4317"
+  insecure: true
+  service_name: "registry-firewall"

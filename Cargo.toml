@@ -67,6 +67,9 @@ flate2 = "1"
 # Concurrency control
 tokio-util = "0.7"
 
+# CLI
+clap = { version = "4", features = ["derive", "env"] }
+
 # Regex (lightweight)
 regex-lite = "0.1"
 glob = "0.3.3"

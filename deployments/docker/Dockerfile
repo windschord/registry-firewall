@@ -46,6 +46,7 @@ FROM debian:bookworm-slim AS runtime
 RUN apt-get update && apt-get install -y \
     ca-certificates \
     libssl3 \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user for security
@@ -75,9 +76,9 @@ WORKDIR /home/regfw
 # Expose HTTP port
 EXPOSE 8080
 
-# Health check - use shell form to support || operator
+# Health check - use curl to verify the application is responding
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD /usr/local/bin/registry-firewall --help || exit 1
+    CMD curl -f http://localhost:8080/health || exit 1
 
 # Environment variables
 ENV REGISTRY_FIREWALL_CONFIG=/config/config.yaml \

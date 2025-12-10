@@ -79,7 +79,11 @@ async fn test_scheduler_initial_sync() {
 
     // Shutdown
     shutdown_tx.send(()).unwrap();
-    let _ = tokio::time::timeout(Duration::from_secs(1), handle).await;
+    let result = tokio::time::timeout(Duration::from_secs(1), handle).await;
+    // Assert the scheduler completed successfully without panic
+    result
+        .expect("Scheduler timed out")
+        .expect("Scheduler task panicked");
 
     assert_eq!(sync_count.load(Ordering::SeqCst), 1);
 }
@@ -112,7 +116,11 @@ async fn test_scheduler_multiple_sources() {
 
     // Shutdown
     shutdown_tx.send(()).unwrap();
-    let _ = tokio::time::timeout(Duration::from_secs(1), handle).await;
+    let result = tokio::time::timeout(Duration::from_secs(1), handle).await;
+    // Assert the scheduler completed successfully without panic
+    result
+        .expect("Scheduler timed out")
+        .expect("Scheduler task panicked");
 
     // Both sources should have synced
     assert_eq!(source1_count.load(Ordering::SeqCst), 1);
@@ -153,7 +161,9 @@ async fn test_manual_sync() {
     assert_eq!(sync_count.load(Ordering::SeqCst), initial_count + 1);
 
     shutdown_tx.send(()).unwrap();
-    let _ = scheduler_handle.await;
+    scheduler_handle
+        .await
+        .expect("Scheduler task panicked");
 }
 
 /// Test 4: Manual sync for unknown source returns error
@@ -185,7 +195,9 @@ async fn test_manual_sync_unknown_source() {
     assert!(matches!(result.unwrap_err(), SyncError::NotFound));
 
     shutdown_tx.send(()).unwrap();
-    let _ = scheduler_handle.await;
+    scheduler_handle
+        .await
+        .expect("Scheduler task panicked");
 }
 
 /// Test 5: Graceful shutdown stops scheduler
@@ -213,9 +225,11 @@ async fn test_graceful_shutdown() {
     // Send shutdown
     shutdown_tx.send(()).unwrap();
 
-    // Should complete within timeout
+    // Should complete within timeout and without panic
     let result = tokio::time::timeout(Duration::from_secs(2), handle).await;
-    assert!(result.is_ok());
+    result
+        .expect("Scheduler timed out")
+        .expect("Scheduler task panicked");
 }
 
 /// Test 6: Status tracking
@@ -247,7 +261,9 @@ async fn test_status_tracking() {
     assert!(result.is_ok());
 
     shutdown_tx.send(()).unwrap();
-    let _ = scheduler_handle.await;
+    scheduler_handle
+        .await
+        .expect("Scheduler task panicked");
 }
 
 /// Test 7: SyncResult default values

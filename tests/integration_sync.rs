@@ -161,9 +161,7 @@ async fn test_manual_sync() {
     assert_eq!(sync_count.load(Ordering::SeqCst), initial_count + 1);
 
     shutdown_tx.send(()).unwrap();
-    scheduler_handle
-        .await
-        .expect("Scheduler task panicked");
+    scheduler_handle.await.expect("Scheduler task panicked");
 }
 
 /// Test 4: Manual sync for unknown source returns error
@@ -195,9 +193,7 @@ async fn test_manual_sync_unknown_source() {
     assert!(matches!(result.unwrap_err(), SyncError::NotFound));
 
     shutdown_tx.send(()).unwrap();
-    scheduler_handle
-        .await
-        .expect("Scheduler task panicked");
+    scheduler_handle.await.expect("Scheduler task panicked");
 }
 
 /// Test 5: Graceful shutdown stops scheduler
@@ -261,9 +257,7 @@ async fn test_status_tracking() {
     assert!(result.is_ok());
 
     shutdown_tx.send(()).unwrap();
-    scheduler_handle
-        .await
-        .expect("Scheduler task panicked");
+    scheduler_handle.await.expect("Scheduler task panicked");
 }
 
 /// Test 7: SyncResult default values

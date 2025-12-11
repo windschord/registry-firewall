@@ -21,7 +21,7 @@ use crate::models::package::PackageRequest;
 use super::traits::{RegistryPlugin, RegistryResponse, RequestContext};
 
 /// Configuration for npm plugin
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Deserialize)]
 pub struct NpmConfig {
     /// Upstream npm registry URL (default: https://registry.npmjs.org)
     pub upstream: String,
@@ -66,9 +66,15 @@ impl NpmPlugin {
 
     /// Create a new npm plugin with custom configuration
     pub fn with_config(config: NpmConfig) -> Self {
+        let client = Client::builder()
+            .connect_timeout(std::time::Duration::from_secs(10))
+            .timeout(std::time::Duration::from_secs(30))
+            .build()
+            .expect("Failed to create HTTP client");
+
         Self {
             config,
-            client: Client::new(),
+            client,
             cache_state: Arc::new(RwLock::new(std::collections::HashMap::new())),
         }
     }
@@ -214,16 +220,20 @@ impl NpmPlugin {
         }
 
         // Update dist-tags if they point to blocked versions
-        // First, get the latest available version from the versions object
+        // First, get the latest available version from the versions object using semantic versioning
         let latest_available: Option<String> = doc
             .get("versions")
             .and_then(|v| v.as_object())
-            .map(|versions| {
-                let mut available: Vec<&str> = versions.keys().map(|s| s.as_str()).collect();
-                available.sort_by(|a, b| b.cmp(a)); // Reverse sort
-                available.first().map(|s| (*s).to_string())
-            })
-            .flatten();
+            .and_then(|versions| {
+                // Parse versions using semver crate and find the highest version
+                let mut parsed_versions: Vec<(semver::Version, &str)> = versions
+                    .keys()
+                    .filter_map(|s| semver::Version::parse(s).ok().map(|v| (v, s.as_str())))
+                    .collect();
+                // Sort by semver in descending order (highest first)
+                parsed_versions.sort_by(|a, b| b.0.cmp(&a.0));
+                parsed_versions.first().map(|(_, s)| (*s).to_string())
+            });
 
         if let Some(dist_tags) = doc.get_mut("dist-tags").and_then(|v| v.as_object_mut()) {
             let blocked_versions: std::collections::HashSet<_> =
@@ -554,9 +564,12 @@ mod tests {
         let time = doc["time"].as_object().unwrap();
         assert!(!time.contains_key("4.17.21"));
 
-        // dist-tags.latest should be updated since 4.17.21 was blocked
+        // dist-tags.latest should be updated to 4.17.22 (highest available) since 4.17.21 was blocked
         let latest = doc["dist-tags"]["latest"].as_str().unwrap();
-        assert_ne!(latest, "4.17.21");
+        assert_eq!(
+            latest, "4.17.22",
+            "dist-tags.latest should be updated to the highest available version"
+        );
     }
 
     // Test 12: filter_metadata trait method implementation

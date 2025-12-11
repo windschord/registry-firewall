@@ -196,8 +196,11 @@ async fn registry_proxy_handler<D: Database + 'static>(
 
     tracing::debug!(plugin = %plugin.name(), "Found matching registry plugin");
 
-    // Build request context with security plugins
-    let ctx = RequestContext::new().with_security_plugins(state.security_plugins.clone());
+    // Build request context with security plugins and cache plugin
+    let mut ctx = RequestContext::new().with_security_plugins(state.security_plugins.clone());
+    if let Some(cache) = &state.cache_plugin {
+        ctx = ctx.with_cache_plugin(cache.clone());
+    }
 
     // Extract headers from request
     let headers: Vec<(String, String)> = req
@@ -212,8 +215,13 @@ async fn registry_proxy_handler<D: Database + 'static>(
         .await
     {
         Ok(response) => {
-            let status =
-                StatusCode::from_u16(response.status).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
+            let status = StatusCode::from_u16(response.status).unwrap_or_else(|_| {
+                tracing::warn!(
+                    status = response.status,
+                    "Invalid HTTP status code from plugin, using 500"
+                );
+                StatusCode::INTERNAL_SERVER_ERROR
+            });
 
             // Build response with headers
             let mut builder = axum::response::Response::builder()

@@ -394,7 +394,7 @@ mod tests {
     #[test]
     fn test_parse_scoped_package_request() {
         // Arrange
-        let plugin = NpmPlugin::new(default_config());
+        let plugin = NpmPlugin::new();
 
         // Act - URL encoded format
         let result = plugin.parse_request("/npm/@types%2Fnode", "GET");
@@ -409,7 +409,7 @@ mod tests {
     #[test]
     fn test_parse_tarball_request() {
         // Arrange
-        let plugin = NpmPlugin::new(default_config());
+        let plugin = NpmPlugin::new();
 
         // Act
         let result = plugin.parse_request("/npm/lodash/-/lodash-4.17.21.tgz", "GET");
@@ -425,7 +425,7 @@ mod tests {
     #[test]
     fn test_filter_metadata_removes_blocked_versions() {
         // Arrange
-        let plugin = NpmPlugin::new(default_config());
+        let plugin = NpmPlugin::new();
         let json = r#"{
             "name": "lodash",
             "versions": {

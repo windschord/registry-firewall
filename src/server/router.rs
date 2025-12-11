@@ -207,9 +207,13 @@ async fn registry_proxy_handler<D: Database + 'static>(
         .collect();
 
     // Handle the request through the plugin
-    match plugin.handle_request(&ctx, &full_path, &method, &headers).await {
+    match plugin
+        .handle_request(&ctx, &full_path, &method, &headers)
+        .await
+    {
         Ok(response) => {
-            let status = StatusCode::from_u16(response.status).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
+            let status =
+                StatusCode::from_u16(response.status).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
 
             // Build response with headers
             let mut builder = axum::response::Response::builder()

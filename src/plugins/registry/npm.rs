@@ -567,8 +567,7 @@ mod tests {
 
         let blocked = vec![BlockedVersion::new("1.0.1", "test block")];
         let result = plugin.filter_metadata(json.as_bytes(), &blocked).unwrap();
-        let filtered: serde_json::Value =
-            serde_json::from_slice(&result).unwrap();
+        let filtered: serde_json::Value = serde_json::from_slice(&result).unwrap();
 
         let versions = filtered["versions"].as_object().unwrap();
         assert!(versions.contains_key("1.0.0"));
@@ -605,14 +604,10 @@ mod tests {
         let plugin = NpmPlugin::new();
 
         // Various URL encodings
-        let req = plugin
-            .parse_request("/npm/@babel%2Fcore", "GET")
-            .unwrap();
+        let req = plugin.parse_request("/npm/@babel%2Fcore", "GET").unwrap();
         assert_eq!(req.name, "@babel/core");
 
-        let req = plugin
-            .parse_request("/npm/@babel%2fcore", "GET")
-            .unwrap();
+        let req = plugin.parse_request("/npm/@babel%2fcore", "GET").unwrap();
         assert_eq!(req.name, "@babel/core");
     }
 }

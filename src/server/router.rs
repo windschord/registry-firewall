@@ -202,11 +202,37 @@ async fn registry_proxy_handler<D: Database + 'static>(
         ctx = ctx.with_cache_plugin(cache.clone());
     }
 
-    // Extract headers from request
+    // Headers that should not be forwarded to upstream (hop-by-hop and sensitive headers)
+    const FILTERED_HEADERS: &[&str] = &[
+        // Hop-by-hop headers (RFC 2616)
+        "connection",
+        "keep-alive",
+        "proxy-authenticate",
+        "proxy-authorization",
+        "te",
+        "trailer",
+        "transfer-encoding",
+        "upgrade",
+        // Sensitive headers that should not leak to upstream
+        "authorization",
+        "cookie",
+        "set-cookie",
+        // Host will be set by the HTTP client for the upstream
+        "host",
+    ];
+
+    // Extract headers from request, filtering out sensitive and hop-by-hop headers
     let headers: Vec<(String, String)> = req
         .headers()
         .iter()
-        .filter_map(|(k, v)| v.to_str().ok().map(|v| (k.to_string(), v.to_string())))
+        .filter_map(|(k, v)| {
+            let key_lower = k.as_str().to_lowercase();
+            if FILTERED_HEADERS.contains(&key_lower.as_str()) {
+                None
+            } else {
+                v.to_str().ok().map(|v| (k.to_string(), v.to_string()))
+            }
+        })
         .collect();
 
     // Handle the request through the plugin

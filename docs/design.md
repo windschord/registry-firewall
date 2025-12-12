@@ -26,8 +26,11 @@ registry-firewallは、プラグインベースのモジュラーアーキテク
 │  │  │ PyPI  │ │  Go   │   │  │  │  OSV  │ │OpenSSF│   │                  │
 │  │  └───────┘ └───────┘   │  │  └───────┘ └───────┘   │                  │
 │  │  ┌───────┐ ┌───────┐   │  │  ┌───────┐ ┌───────┐   │                  │
-│  │  │ Cargo │ │Docker │   │  │  │Custom │ │MinAge │   │                  │
+│  │  │ Cargo │ │ npm   │   │  │  │Custom │ │MinAge │   │                  │
 │  │  └───────┘ └───────┘   │  │  └───────┘ └───────┘   │                  │
+│  │  ┌───────┐             │  │                        │                  │
+│  │  │Docker │             │  │                        │                  │
+│  │  └───────┘             │  │                        │                  │
 │  └─────────────────────────┘  └─────────────────────────┘                  │
 │           │                             │                                   │
 │           ▼                             ▼                                   │
@@ -108,7 +111,7 @@ pub trait SecuritySourcePlugin: Send + Sync {
 **目的**: HTTPリクエストの受信とルーティング
 
 **責務**:
-- プロキシエンドポイント（/pypi, /go, /cargo, /v2）のルーティング
+- プロキシエンドポイント（/pypi, /go, /cargo, /npm, /v2）のルーティング
 - 管理エンドポイント（/ui, /api, /health, /metrics）のルーティング
 - ミドルウェアチェーン（認証、ログ、トレース）の適用
 
@@ -323,10 +326,7 @@ mod tests {
             <a href="requests-2.30.0.tar.gz">requests-2.30.0.tar.gz</a>
             <a href="requests-2.31.0.tar.gz">requests-2.31.0.tar.gz</a>
         "#;
-        let blocked = vec![BlockedVersion {
-            version: "2.31.0".into(),
-            reason: "vulnerability".into(),
-        }];
+        let blocked = vec![BlockedVersion::new("2.31.0", "vulnerability")];
         
         // Act
         let result = plugin.filter_metadata(html.as_bytes(), &blocked);
@@ -361,9 +361,93 @@ mod tests {
 - `/cargo/crates/{crate}/{version}/download` のcrateファイル取得
 - JSON Lines形式のインデックスからブロック対象バージョンを除外
 
-**アップストリーム**: 
+**アップストリーム**:
 - Index: `https://index.crates.io`
 - Download: `https://static.crates.io/crates`
+
+#### npm Plugin
+
+**目的**: npm Registry APIのプロキシ
+
+**責務**:
+- `/{package}` のパッケージメタデータ取得
+- `/@{scope}/{package}` のスコープ付きパッケージメタデータ取得
+- `/{package}/-/{package}-{version}.tgz` のtarball取得
+- JSON形式のメタデータからブロック対象バージョンを除外
+- dist-tagsの自動更新（ブロックされたバージョンを指す場合）
+
+**アップストリーム**: `https://registry.npmjs.org`
+
+**特記事項**:
+- スコープ付きパッケージ（@scope/package）はURLエンコード（%2F）に対応
+- パッケージ名は大文字小文字を区別しない比較を実施
+
+**テスト例**:
+```rust
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_scoped_package_request() {
+        // Arrange
+        let plugin = NpmPlugin::new();
+
+        // Act - URL encoded format
+        let result = plugin.parse_request("/npm/@types%2Fnode", "GET");
+
+        // Assert
+        assert!(result.is_ok());
+        let pkg_req = result.unwrap();
+        assert_eq!(pkg_req.name, "@types/node");
+        assert_eq!(pkg_req.request_type, RequestType::Metadata);
+    }
+
+    #[test]
+    fn test_parse_tarball_request() {
+        // Arrange
+        let plugin = NpmPlugin::new();
+
+        // Act
+        let result = plugin.parse_request("/npm/lodash/-/lodash-4.17.21.tgz", "GET");
+
+        // Assert
+        assert!(result.is_ok());
+        let pkg_req = result.unwrap();
+        assert_eq!(pkg_req.name, "lodash");
+        assert_eq!(pkg_req.version, Some("4.17.21".into()));
+        assert_eq!(pkg_req.request_type, RequestType::Download);
+    }
+
+    #[test]
+    fn test_filter_metadata_removes_blocked_versions() {
+        // Arrange
+        let plugin = NpmPlugin::new();
+        let json = r#"{
+            "name": "lodash",
+            "versions": {
+                "4.17.20": {},
+                "4.17.21": {}
+            },
+            "dist-tags": {
+                "latest": "4.17.21"
+            }
+        }"#;
+        let blocked = vec![BlockedVersion::new("4.17.21", "vulnerability")];
+
+        // Act
+        let result = plugin.filter_metadata(json.as_bytes(), &blocked);
+
+        // Assert
+        assert!(result.is_ok());
+        let filtered: serde_json::Value =
+            serde_json::from_slice(&result.unwrap()).unwrap();
+        assert!(!filtered["versions"].as_object().unwrap().contains_key("4.17.21"));
+        // dist-tags.latestは4.17.20に更新される
+        assert_eq!(filtered["dist-tags"]["latest"], "4.17.20");
+    }
+}
+```
 
 #### Docker Plugin
 
@@ -1834,6 +1918,7 @@ registry-firewall/
 │   │   │   ├── pypi.rs
 │   │   │   ├── golang.rs
 │   │   │   ├── cargo.rs
+│   │   │   ├── npm.rs
 │   │   │   └── docker.rs
 │   │   ├── security/
 │   │   │   ├── mod.rs
@@ -1928,6 +2013,12 @@ registry_plugins:
     options:
       dl_upstream: "https://static.crates.io/crates"
 
+  npm:
+    enabled: true
+    path_prefix: "/npm"
+    upstream: "https://registry.npmjs.org"
+    cache_ttl_secs: 86400
+
   docker:
     enabled: true
     path_prefix: "/v2"
@@ -1938,7 +2029,7 @@ security_plugins:
   osv:
     enabled: true
     sync_interval_secs: 3600      # 1時間ごと
-    ecosystems: ["pypi", "go", "cargo"]
+    ecosystems: ["pypi", "go", "cargo", "npm"]
     options:
       min_severity: "MEDIUM"
     retry:
@@ -1952,7 +2043,7 @@ security_plugins:
   openssf_malicious:
     enabled: true
     sync_interval_secs: 1800      # 30分ごと
-    ecosystems: ["pypi", "go", "cargo"]
+    ecosystems: ["pypi", "go", "cargo", "npm"]
     options:
       repo_path: "/data/openssf-malicious"
       git_timeout_secs: 300
@@ -2005,3 +2096,4 @@ logging:
 | 1.0 | 2025-12-02 | 初版作成 | - |
 | 1.1 | 2025-12-02 | 実装言語をRustに変更、TDDプロセスを追加 | - |
 | 1.2 | 2025-12-03 | 自動更新・リトライ・負荷軽減機能を追加 | - |
+| 1.3 | 2025-12-10 | npmレジストリプラグインの仕様を追加 | - |

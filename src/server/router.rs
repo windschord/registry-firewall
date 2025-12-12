@@ -3,7 +3,7 @@
 //! This module defines the axum router that handles all HTTP requests.
 //! It provides routes for:
 //! - Health checks and metrics
-//! - Registry proxies (PyPI, Go, Cargo, Docker)
+//! - Registry proxies (PyPI, Go, Cargo, npm, Docker)
 //! - Web UI and API endpoints
 
 use axum::{
@@ -94,6 +94,7 @@ pub fn build_router<D: Database + 'static>(state: AppState<D>) -> Router {
         .route("/pypi/*path", any(registry_proxy_handler::<D>))
         .route("/go/*path", any(registry_proxy_handler::<D>))
         .route("/cargo/*path", any(registry_proxy_handler::<D>))
+        .route("/npm/*path", any(registry_proxy_handler::<D>))
         .route("/v2/*path", any(registry_proxy_handler::<D>))
         // API routes
         .route("/api/dashboard", get(api_dashboard_handler::<D>))
@@ -157,25 +158,129 @@ async fn metrics_handler() -> impl IntoResponse {
 
 /// Generic registry proxy handler
 ///
-/// **Note**: This is currently a placeholder implementation. Full proxy
-/// functionality including security checks, caching, and upstream forwarding
-/// will be implemented in Phase 11 integration tasks.
+/// Routes requests to the appropriate registry plugin based on path prefix.
 async fn registry_proxy_handler<D: Database + 'static>(
-    State(_state): State<AppState<D>>,
+    State(state): State<AppState<D>>,
     Path(_path): Path<String>,
     req: axum::http::Request<axum::body::Body>,
 ) -> impl IntoResponse {
-    // Get the full path from the request
-    let full_path = req.uri().path();
+    use crate::plugins::registry::traits::RequestContext;
 
-    // Find the matching registry plugin
-    // The proxy handler implementation will be completed in a future phase
-    // For now, return a placeholder response
-    tracing::debug!(path = %full_path, "Registry proxy request received");
-    (
-        StatusCode::NOT_IMPLEMENTED,
-        "Registry proxy not yet implemented".to_string(),
-    )
+    // Get the full path from the request
+    let full_path = req.uri().path().to_string();
+    let method = req.method().to_string();
+
+    tracing::debug!(path = %full_path, method = %method, "Registry proxy request received");
+
+    // Find the matching registry plugin based on path prefix
+    let plugin = state
+        .registry_plugins
+        .iter()
+        .find(|p| full_path.starts_with(p.path_prefix()));
+
+    let plugin = match plugin {
+        Some(p) => p,
+        None => {
+            tracing::warn!(path = %full_path, "No matching registry plugin found");
+            return (
+                StatusCode::NOT_FOUND,
+                [(
+                    axum::http::header::CONTENT_TYPE,
+                    "text/plain; charset=utf-8",
+                )],
+                "No matching registry plugin for this path".to_string(),
+            )
+                .into_response();
+        }
+    };
+
+    tracing::debug!(plugin = %plugin.name(), "Found matching registry plugin");
+
+    // Build request context with security plugins and cache plugin
+    let mut ctx = RequestContext::new().with_security_plugins(state.security_plugins.clone());
+    if let Some(cache) = &state.cache_plugin {
+        ctx = ctx.with_cache_plugin(cache.clone());
+    }
+
+    // Headers that should not be forwarded to upstream (hop-by-hop and sensitive headers)
+    const FILTERED_HEADERS: &[&str] = &[
+        // Hop-by-hop headers (RFC 2616)
+        "connection",
+        "keep-alive",
+        "proxy-authenticate",
+        "proxy-authorization",
+        "te",
+        "trailer",
+        "transfer-encoding",
+        "upgrade",
+        // Sensitive headers that should not leak to upstream
+        "authorization",
+        "cookie",
+        "set-cookie",
+        // Host will be set by the HTTP client for the upstream
+        "host",
+    ];
+
+    // Extract headers from request, filtering out sensitive and hop-by-hop headers
+    let headers: Vec<(String, String)> = req
+        .headers()
+        .iter()
+        .filter_map(|(k, v)| {
+            let key_lower = k.as_str().to_lowercase();
+            if FILTERED_HEADERS.contains(&key_lower.as_str()) {
+                None
+            } else {
+                v.to_str().ok().map(|v| (k.to_string(), v.to_string()))
+            }
+        })
+        .collect();
+
+    // Handle the request through the plugin
+    match plugin
+        .handle_request(&ctx, &full_path, &method, &headers)
+        .await
+    {
+        Ok(response) => {
+            let status = StatusCode::from_u16(response.status).unwrap_or_else(|_| {
+                tracing::warn!(
+                    status = response.status,
+                    "Invalid HTTP status code from plugin, using 500"
+                );
+                StatusCode::INTERNAL_SERVER_ERROR
+            });
+
+            // Build response with headers
+            let mut builder = axum::response::Response::builder()
+                .status(status)
+                .header(axum::http::header::CONTENT_TYPE, &response.content_type);
+
+            for (name, value) in &response.headers {
+                builder = builder.header(name.as_str(), value.as_str());
+            }
+
+            builder
+                .body(axum::body::Body::from(response.body))
+                .unwrap_or_else(|_| {
+                    axum::response::Response::builder()
+                        .status(StatusCode::INTERNAL_SERVER_ERROR)
+                        .body(axum::body::Body::from("Failed to build response"))
+                        .unwrap()
+                })
+                .into_response()
+        }
+        Err(e) => {
+            tracing::error!(error = %e, "Registry proxy error");
+            (
+                StatusCode::BAD_GATEWAY,
+                [(
+                    axum::http::header::CONTENT_TYPE,
+                    "text/plain; charset=utf-8",
+                )],
+                format!("Proxy error: {}", e),
+            )
+                .into_response()
+        }
+    }
 }
 
 // =============================================================================
@@ -650,7 +755,7 @@ mod tests {
         assert_eq!(body.requests_total, 0);
     }
 
-    // Test 3: PyPI proxy route is routed
+    // Test 3: PyPI proxy route is routed (returns NOT_FOUND when no plugin registered)
     #[tokio::test]
     async fn test_pypi_route_exists() {
         let state = create_test_state();
@@ -658,11 +763,11 @@ mod tests {
         let server = TestServer::new(app).unwrap();
 
         let response = server.get("/pypi/simple/requests/").await;
-        // Should not be 404 (route exists but returns NOT_IMPLEMENTED for now)
-        response.assert_status(StatusCode::NOT_IMPLEMENTED);
+        // Returns NOT_FOUND when no matching plugin is registered
+        response.assert_status(StatusCode::NOT_FOUND);
     }
 
-    // Test 4: Go proxy route is routed
+    // Test 4: Go proxy route is routed (returns NOT_FOUND when no plugin registered)
     #[tokio::test]
     async fn test_go_route_exists() {
         let state = create_test_state();
@@ -670,10 +775,10 @@ mod tests {
         let server = TestServer::new(app).unwrap();
 
         let response = server.get("/go/github.com/test/pkg/@v/list").await;
-        response.assert_status(StatusCode::NOT_IMPLEMENTED);
+        response.assert_status(StatusCode::NOT_FOUND);
     }
 
-    // Test 5: Cargo proxy route is routed
+    // Test 5: Cargo proxy route is routed (returns NOT_FOUND when no plugin registered)
     #[tokio::test]
     async fn test_cargo_route_exists() {
         let state = create_test_state();
@@ -681,10 +786,10 @@ mod tests {
         let server = TestServer::new(app).unwrap();
 
         let response = server.get("/cargo/se/rd/serde").await;
-        response.assert_status(StatusCode::NOT_IMPLEMENTED);
+        response.assert_status(StatusCode::NOT_FOUND);
     }
 
-    // Test 6: Docker v2 proxy route is routed
+    // Test 6: Docker v2 proxy route is routed (returns NOT_FOUND when no plugin registered)
     #[tokio::test]
     async fn test_docker_route_exists() {
         let state = create_test_state();
@@ -692,7 +797,29 @@ mod tests {
         let server = TestServer::new(app).unwrap();
 
         let response = server.get("/v2/library/alpine/manifests/latest").await;
-        response.assert_status(StatusCode::NOT_IMPLEMENTED);
+        response.assert_status(StatusCode::NOT_FOUND);
+    }
+
+    // Test 6b: npm proxy route is routed (returns NOT_FOUND when no plugin registered)
+    #[tokio::test]
+    async fn test_npm_route_exists() {
+        let state = create_test_state();
+        let app = build_router(state);
+        let server = TestServer::new(app).unwrap();
+
+        let response = server.get("/npm/lodash").await;
+        response.assert_status(StatusCode::NOT_FOUND);
+    }
+
+    // Test 6c: npm scoped package route (returns NOT_FOUND when no plugin registered)
+    #[tokio::test]
+    async fn test_npm_scoped_route_exists() {
+        let state = create_test_state();
+        let app = build_router(state);
+        let server = TestServer::new(app).unwrap();
+
+        let response = server.get("/npm/@types/node").await;
+        response.assert_status(StatusCode::NOT_FOUND);
     }
 
     // Test 7: API dashboard endpoint

@@ -319,6 +319,8 @@ impl RegistryPlugin for NpmPlugin {
 
         // Check security plugins for blocked packages/versions
         let mut blocked_versions = Vec::new();
+        // Normalize request name once before the loop to avoid repeated computation
+        let normalized_req_name = Self::normalize_package_name(&pkg_req.name);
         for plugin in &ctx.security_plugins {
             if let Some(version) = &pkg_req.version {
                 if let Some(reason) = plugin
@@ -332,8 +334,7 @@ impl RegistryPlugin for NpmPlugin {
                 let blocked = plugin.get_blocked_packages(&pkg_req.ecosystem).await;
                 for pkg in blocked {
                     let normalized_name = Self::normalize_package_name(&pkg.package);
-                    let normalized_req = Self::normalize_package_name(&pkg_req.name);
-                    if normalized_name == normalized_req {
+                    if normalized_name == normalized_req_name {
                         blocked_versions.push(BlockedVersion::new(
                             &pkg.version,
                             pkg.reason.unwrap_or_else(|| "Blocked".to_string()),

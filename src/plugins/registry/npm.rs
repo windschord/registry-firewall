@@ -236,15 +236,16 @@ impl NpmPlugin {
             });
 
         if let Some(dist_tags) = doc.get_mut("dist-tags").and_then(|v| v.as_object_mut()) {
-            let blocked_versions: std::collections::HashSet<_> =
-                blocked.iter().map(|bv| &bv.version).collect();
+            // Use owned Strings to avoid repeated allocations during contains() checks
+            let blocked_versions: std::collections::HashSet<String> =
+                blocked.iter().map(|bv| bv.version.clone()).collect();
 
             // Find tags pointing to blocked versions and update them
             let tags_to_update: Vec<String> = dist_tags
                 .iter()
                 .filter_map(|(tag, version)| {
                     if let Some(v) = version.as_str() {
-                        if blocked_versions.contains(&v.to_string()) {
+                        if blocked_versions.contains(v) {
                             return Some(tag.clone());
                         }
                     }
@@ -347,13 +348,12 @@ impl RegistryPlugin for NpmPlugin {
         let upstream_url = format!("{}{}", self.config.upstream, upstream_path);
 
         // Fetch from upstream
-        let response = self
-            .client
-            .get(&upstream_url)
-            .header("Accept", "application/json")
-            .send()
-            .await
-            .map_err(ProxyError::Upstream)?;
+        // Only set Accept: application/json for metadata requests, not for tarball downloads
+        let mut request = self.client.get(&upstream_url);
+        if pkg_req.is_metadata() {
+            request = request.header("Accept", "application/json");
+        }
+        let response = request.send().await.map_err(ProxyError::Upstream)?;
 
         if !response.status().is_success() {
             if response.status().as_u16() == 404 {

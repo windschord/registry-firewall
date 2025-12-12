@@ -252,10 +252,19 @@ impl NpmPlugin {
                 })
                 .collect();
 
-            // Update blocked tags to point to the latest available version
-            if let Some(latest) = latest_available {
-                for tag in tags_to_update {
-                    dist_tags.insert(tag, serde_json::Value::String(latest.clone()));
+            // Update blocked tags to point to the latest available version,
+            // or remove them if no versions are available
+            match latest_available {
+                Some(latest) => {
+                    for tag in tags_to_update {
+                        dist_tags.insert(tag, serde_json::Value::String(latest.clone()));
+                    }
+                }
+                None => {
+                    // All versions are blocked, remove the affected dist-tags
+                    for tag in tags_to_update {
+                        dist_tags.remove(&tag);
+                    }
                 }
             }
         }
@@ -622,5 +631,130 @@ mod tests {
 
         let req = plugin.parse_request("/npm/@babel%2fcore", "GET").unwrap();
         assert_eq!(req.name, "@babel/core");
+    }
+
+    // Test 16: All versions blocked - dist-tags should be removed
+    #[test]
+    fn test_filter_json_all_versions_blocked() {
+        let plugin = NpmPlugin::new();
+
+        let json = r#"{
+            "name": "malicious-pkg",
+            "versions": {
+                "1.0.0": {"version": "1.0.0"},
+                "1.0.1": {"version": "1.0.1"}
+            },
+            "dist-tags": {
+                "latest": "1.0.1",
+                "stable": "1.0.0"
+            }
+        }"#;
+
+        // Block all versions
+        let blocked = vec![
+            BlockedVersion::new("1.0.0", "malware"),
+            BlockedVersion::new("1.0.1", "malware"),
+        ];
+        let filtered = plugin.filter_json_metadata(json, &blocked).unwrap();
+        let doc: serde_json::Value = serde_json::from_str(&filtered).unwrap();
+
+        // All versions should be removed
+        let versions = doc["versions"].as_object().unwrap();
+        assert!(versions.is_empty(), "All versions should be removed");
+
+        // dist-tags pointing to blocked versions should be removed
+        let dist_tags = doc["dist-tags"].as_object().unwrap();
+        assert!(
+            !dist_tags.contains_key("latest"),
+            "latest tag should be removed when all versions blocked"
+        );
+        assert!(
+            !dist_tags.contains_key("stable"),
+            "stable tag should be removed when all versions blocked"
+        );
+    }
+
+    // Test 17: Non-semver versions should be handled gracefully
+    #[test]
+    fn test_filter_json_non_semver_versions() {
+        let plugin = NpmPlugin::new();
+
+        let json = r#"{
+            "name": "legacy-pkg",
+            "versions": {
+                "1.0.0": {"version": "1.0.0"},
+                "2.0.0": {"version": "2.0.0"},
+                "latest": {"version": "latest"},
+                "dev": {"version": "dev"}
+            },
+            "dist-tags": {
+                "latest": "latest"
+            }
+        }"#;
+
+        // Block the non-semver "latest" version
+        let blocked = vec![BlockedVersion::new("latest", "invalid version")];
+        let filtered = plugin.filter_json_metadata(json, &blocked).unwrap();
+        let doc: serde_json::Value = serde_json::from_str(&filtered).unwrap();
+
+        // Non-semver version should be removed
+        let versions = doc["versions"].as_object().unwrap();
+        assert!(!versions.contains_key("latest"));
+        assert!(versions.contains_key("1.0.0"));
+        assert!(versions.contains_key("2.0.0"));
+        assert!(versions.contains_key("dev")); // Not blocked
+
+        // dist-tags.latest should be updated to highest semver version (2.0.0)
+        let latest = doc["dist-tags"]["latest"].as_str().unwrap();
+        assert_eq!(
+            latest, "2.0.0",
+            "Should fall back to highest semver-compliant version"
+        );
+    }
+
+    // Test 18: Missing dist-tags should be handled gracefully
+    #[test]
+    fn test_filter_json_missing_dist_tags() {
+        let plugin = NpmPlugin::new();
+
+        let json = r#"{
+            "name": "no-dist-tags",
+            "versions": {
+                "1.0.0": {"version": "1.0.0"},
+                "1.0.1": {"version": "1.0.1"}
+            }
+        }"#;
+
+        let blocked = vec![BlockedVersion::new("1.0.1", "vulnerability")];
+        let result = plugin.filter_json_metadata(json, &blocked);
+
+        // Should not panic and should complete successfully
+        assert!(result.is_ok());
+        let filtered = result.unwrap();
+        let doc: serde_json::Value = serde_json::from_str(&filtered).unwrap();
+
+        // Version should still be filtered
+        let versions = doc["versions"].as_object().unwrap();
+        assert!(versions.contains_key("1.0.0"));
+        assert!(!versions.contains_key("1.0.1"));
+    }
+
+    // Test 19: Empty versions object should be handled
+    #[test]
+    fn test_filter_json_empty_versions() {
+        let plugin = NpmPlugin::new();
+
+        let json = r#"{
+            "name": "empty-pkg",
+            "versions": {},
+            "dist-tags": {
+                "latest": "1.0.0"
+            }
+        }"#;
+
+        let blocked = vec![BlockedVersion::new("1.0.0", "test")];
+        let result = plugin.filter_json_metadata(json, &blocked);
+
+        assert!(result.is_ok());
     }
 }

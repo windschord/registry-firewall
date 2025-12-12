@@ -326,10 +326,7 @@ mod tests {
             <a href="requests-2.30.0.tar.gz">requests-2.30.0.tar.gz</a>
             <a href="requests-2.31.0.tar.gz">requests-2.31.0.tar.gz</a>
         "#;
-        let blocked = vec![BlockedVersion {
-            version: "2.31.0".into(),
-            reason: "vulnerability".into(),
-        }];
+        let blocked = vec![BlockedVersion::new("2.31.0", "vulnerability")];
         
         // Act
         let result = plugin.filter_metadata(html.as_bytes(), &blocked);
@@ -436,10 +433,7 @@ mod tests {
                 "latest": "4.17.21"
             }
         }"#;
-        let blocked = vec![BlockedVersion {
-            version: "4.17.21".into(),
-            reason: "vulnerability".into(),
-        }];
+        let blocked = vec![BlockedVersion::new("4.17.21", "vulnerability")];
 
         // Act
         let result = plugin.filter_metadata(json.as_bytes(), &blocked);

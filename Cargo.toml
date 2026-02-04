@@ -58,7 +58,7 @@ rust-embed = "8"
 mime_guess = "2"
 
 # Git operations (for OpenSSF sync)
-git2 = "0.18"
+git2 = "0.20"
 
 # Archive handling
 zip = "0.6"

@@ -12,8 +12,6 @@ use reqwest::StatusCode;
 use wiremock::matchers::{method, path, path_regex};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
-use registry_firewall::auth::{AuthConfig, AuthManager};
-use registry_firewall::database::SqliteDatabase;
 use registry_firewall::error::SyncError;
 use registry_firewall::models::{BlockReason, BlockedPackage, Severity, SyncResult, SyncStatus};
 use registry_firewall::plugins::registry::cargo::{CargoConfig, CargoPlugin};
@@ -23,7 +21,8 @@ use registry_firewall::plugins::registry::npm::{NpmConfig, NpmPlugin};
 use registry_firewall::plugins::registry::pypi::{PyPIConfig, PyPIPlugin};
 use registry_firewall::plugins::registry::RegistryPlugin;
 use registry_firewall::plugins::security::traits::SecuritySourcePlugin;
-use registry_firewall::server::AppState;
+
+use common::{create_test_state_with_plugins, run_test_server};
 
 /// Test security plugin that blocks specific packages
 struct TestSecurityPlugin {
@@ -77,9 +76,7 @@ impl SecuritySourcePlugin for TestSecurityPlugin {
     ) -> Option<BlockReason> {
         self.blocked_packages
             .iter()
-            .find(|p| {
-                p.ecosystem == ecosystem && p.package == package && p.version == version
-            })
+            .find(|p| p.ecosystem == ecosystem && p.package == package && p.version == version)
             .map(|p| {
                 BlockReason::new("test-security", p.reason.clone().unwrap_or_default())
                     .with_severity(p.severity.clone().unwrap_or(Severity::High))
@@ -95,61 +92,6 @@ impl SecuritySourcePlugin for TestSecurityPlugin {
     }
 }
 
-/// Create test app state with plugins
-async fn create_test_state_with_plugins(
-    registry_plugins: Vec<Arc<dyn RegistryPlugin>>,
-    security_plugins: Vec<Arc<dyn SecuritySourcePlugin>>,
-) -> AppState<SqliteDatabase> {
-    let db = Arc::new(
-        SqliteDatabase::new(":memory:")
-            .await
-            .expect("Failed to create test database"),
-    );
-
-    let auth_config = AuthConfig {
-        enabled: false,
-        ..Default::default()
-    };
-    let auth_manager = Arc::new(AuthManager::new(Arc::clone(&db), auth_config));
-
-    AppState {
-        auth_manager,
-        database: db,
-        registry_plugins,
-        security_plugins,
-        cache_plugin: None,
-    }
-}
-
-/// Run test server with custom state
-async fn run_test_server_with_state(
-    state: AppState<SqliteDatabase>,
-) -> (std::net::SocketAddr, tokio::sync::oneshot::Sender<()>) {
-    use tokio::net::TcpListener;
-
-    let listener = TcpListener::bind("127.0.0.1:0")
-        .await
-        .expect("Failed to bind test server");
-    let addr = listener.local_addr().expect("Failed to get local address");
-
-    let (shutdown_tx, shutdown_rx) = tokio::sync::oneshot::channel();
-
-    let app = registry_firewall::server::build_router(state);
-
-    tokio::spawn(async move {
-        axum::serve(listener, app)
-            .with_graceful_shutdown(async move {
-                let _ = shutdown_rx.await;
-            })
-            .await
-            .expect("Server error");
-    });
-
-    tokio::time::sleep(Duration::from_millis(100)).await;
-
-    (addr, shutdown_tx)
-}
-
 // =============================================================================
 // PyPI Tests - pip install
 // =============================================================================
@@ -159,10 +101,11 @@ async fn run_test_server_with_state(
 async fn test_pypi_blocked_package_download_returns_403() {
     let mock_server = MockServer::start().await;
 
-    // Set up mock upstream (not needed because we should block before reaching upstream)
+    // Upstream mock should never be called for blocked packages
     Mock::given(method("GET"))
         .and(path_regex("/packages/.*"))
         .respond_with(ResponseTemplate::new(200).set_body_bytes("package content"))
+        .expect(0)
         .mount(&mock_server)
         .await;
 
@@ -175,14 +118,18 @@ async fn test_pypi_blocked_package_download_returns_403() {
     let pypi_plugin: Arc<dyn RegistryPlugin> = Arc::new(PyPIPlugin::with_config(pypi_config));
 
     // Create security plugin that blocks requests-2.31.0
-    let security_plugin: Arc<dyn SecuritySourcePlugin> = Arc::new(TestSecurityPlugin::new(vec![
-        BlockedPackage::new("pypi", "requests", "2.31.0", "test-security")
-            .with_reason("Known malware")
-            .with_severity(Severity::Critical),
-    ]));
+    let security_plugin: Arc<dyn SecuritySourcePlugin> =
+        Arc::new(TestSecurityPlugin::new(vec![BlockedPackage::new(
+            "pypi",
+            "requests",
+            "2.31.0",
+            "test-security",
+        )
+        .with_reason("Known malware")
+        .with_severity(Severity::Critical)]));
 
     let state = create_test_state_with_plugins(vec![pypi_plugin], vec![security_plugin]).await;
-    let (addr, _shutdown) = run_test_server_with_state(state).await;
+    let (addr, _shutdown) = run_test_server(state).await;
 
     // Simulate pip download request
     let client = reqwest::Client::new();
@@ -223,13 +170,17 @@ async fn test_pypi_safe_package_download_succeeds() {
     let pypi_plugin: Arc<dyn RegistryPlugin> = Arc::new(PyPIPlugin::with_config(pypi_config));
 
     // Block only version 2.31.0, not 2.32.0
-    let security_plugin: Arc<dyn SecuritySourcePlugin> = Arc::new(TestSecurityPlugin::new(vec![
-        BlockedPackage::new("pypi", "requests", "2.31.0", "test-security")
-            .with_reason("Known malware"),
-    ]));
+    let security_plugin: Arc<dyn SecuritySourcePlugin> =
+        Arc::new(TestSecurityPlugin::new(vec![BlockedPackage::new(
+            "pypi",
+            "requests",
+            "2.31.0",
+            "test-security",
+        )
+        .with_reason("Known malware")]));
 
     let state = create_test_state_with_plugins(vec![pypi_plugin], vec![security_plugin]).await;
-    let (addr, _shutdown) = run_test_server_with_state(state).await;
+    let (addr, _shutdown) = run_test_server(state).await;
 
     let client = reqwest::Client::new();
     let response = client
@@ -278,13 +229,17 @@ async fn test_pypi_metadata_filters_blocked_versions() {
     };
     let pypi_plugin: Arc<dyn RegistryPlugin> = Arc::new(PyPIPlugin::with_config(pypi_config));
 
-    let security_plugin: Arc<dyn SecuritySourcePlugin> = Arc::new(TestSecurityPlugin::new(vec![
-        BlockedPackage::new("pypi", "requests", "2.31.0", "test-security")
-            .with_reason("Known malware"),
-    ]));
+    let security_plugin: Arc<dyn SecuritySourcePlugin> =
+        Arc::new(TestSecurityPlugin::new(vec![BlockedPackage::new(
+            "pypi",
+            "requests",
+            "2.31.0",
+            "test-security",
+        )
+        .with_reason("Known malware")]));
 
     let state = create_test_state_with_plugins(vec![pypi_plugin], vec![security_plugin]).await;
-    let (addr, _shutdown) = run_test_server_with_state(state).await;
+    let (addr, _shutdown) = run_test_server(state).await;
 
     let client = reqwest::Client::new();
     let response = client
@@ -314,9 +269,11 @@ async fn test_pypi_metadata_filters_blocked_versions() {
 async fn test_go_blocked_module_download_returns_403() {
     let mock_server = MockServer::start().await;
 
+    // Upstream mock should never be called for blocked modules
     Mock::given(method("GET"))
         .and(path_regex("/github.com/test/pkg/@v/.*"))
         .respond_with(ResponseTemplate::new(200).set_body_bytes("module content"))
+        .expect(0)
         .mount(&mock_server)
         .await;
 
@@ -327,14 +284,18 @@ async fn test_go_blocked_module_download_returns_403() {
     };
     let go_plugin: Arc<dyn RegistryPlugin> = Arc::new(GoModulePlugin::with_config(go_config));
 
-    let security_plugin: Arc<dyn SecuritySourcePlugin> = Arc::new(TestSecurityPlugin::new(vec![
-        BlockedPackage::new("go", "github.com/test/pkg", "v1.0.0", "test-security")
-            .with_reason("Known vulnerability")
-            .with_severity(Severity::High),
-    ]));
+    let security_plugin: Arc<dyn SecuritySourcePlugin> =
+        Arc::new(TestSecurityPlugin::new(vec![BlockedPackage::new(
+            "go",
+            "github.com/test/pkg",
+            "v1.0.0",
+            "test-security",
+        )
+        .with_reason("Known vulnerability")
+        .with_severity(Severity::High)]));
 
     let state = create_test_state_with_plugins(vec![go_plugin], vec![security_plugin]).await;
-    let (addr, _shutdown) = run_test_server_with_state(state).await;
+    let (addr, _shutdown) = run_test_server(state).await;
 
     let client = reqwest::Client::new();
     let response = client
@@ -374,20 +335,21 @@ async fn test_go_version_list_filters_blocked_versions() {
     };
     let go_plugin: Arc<dyn RegistryPlugin> = Arc::new(GoModulePlugin::with_config(go_config));
 
-    let security_plugin: Arc<dyn SecuritySourcePlugin> = Arc::new(TestSecurityPlugin::new(vec![
-        BlockedPackage::new("go", "github.com/test/pkg", "v1.1.0", "test-security")
-            .with_reason("Known vulnerability"),
-    ]));
+    let security_plugin: Arc<dyn SecuritySourcePlugin> =
+        Arc::new(TestSecurityPlugin::new(vec![BlockedPackage::new(
+            "go",
+            "github.com/test/pkg",
+            "v1.1.0",
+            "test-security",
+        )
+        .with_reason("Known vulnerability")]));
 
     let state = create_test_state_with_plugins(vec![go_plugin], vec![security_plugin]).await;
-    let (addr, _shutdown) = run_test_server_with_state(state).await;
+    let (addr, _shutdown) = run_test_server(state).await;
 
     let client = reqwest::Client::new();
     let response = client
-        .get(format!(
-            "http://{}/go/github.com/test/pkg/@v/list",
-            addr
-        ))
+        .get(format!("http://{}/go/github.com/test/pkg/@v/list", addr))
         .send()
         .await
         .expect("Failed to send request");
@@ -412,9 +374,11 @@ async fn test_go_version_list_filters_blocked_versions() {
 async fn test_cargo_blocked_crate_download_returns_403() {
     let mock_server = MockServer::start().await;
 
+    // Upstream mock should never be called for blocked crates
     Mock::given(method("GET"))
         .and(path_regex("/crates/.*"))
         .respond_with(ResponseTemplate::new(200).set_body_bytes("crate content"))
+        .expect(0)
         .mount(&mock_server)
         .await;
 
@@ -426,14 +390,18 @@ async fn test_cargo_blocked_crate_download_returns_403() {
     };
     let cargo_plugin: Arc<dyn RegistryPlugin> = Arc::new(CargoPlugin::with_config(cargo_config));
 
-    let security_plugin: Arc<dyn SecuritySourcePlugin> = Arc::new(TestSecurityPlugin::new(vec![
-        BlockedPackage::new("cargo", "serde", "1.0.0", "test-security")
-            .with_reason("Known vulnerability")
-            .with_severity(Severity::High),
-    ]));
+    let security_plugin: Arc<dyn SecuritySourcePlugin> =
+        Arc::new(TestSecurityPlugin::new(vec![BlockedPackage::new(
+            "cargo",
+            "serde",
+            "1.0.0",
+            "test-security",
+        )
+        .with_reason("Known vulnerability")
+        .with_severity(Severity::High)]));
 
     let state = create_test_state_with_plugins(vec![cargo_plugin], vec![security_plugin]).await;
-    let (addr, _shutdown) = run_test_server_with_state(state).await;
+    let (addr, _shutdown) = run_test_server(state).await;
 
     let client = reqwest::Client::new();
     let response = client
@@ -477,13 +445,17 @@ async fn test_cargo_index_filters_blocked_versions() {
     };
     let cargo_plugin: Arc<dyn RegistryPlugin> = Arc::new(CargoPlugin::with_config(cargo_config));
 
-    let security_plugin: Arc<dyn SecuritySourcePlugin> = Arc::new(TestSecurityPlugin::new(vec![
-        BlockedPackage::new("cargo", "serde", "1.0.1", "test-security")
-            .with_reason("Known vulnerability"),
-    ]));
+    let security_plugin: Arc<dyn SecuritySourcePlugin> =
+        Arc::new(TestSecurityPlugin::new(vec![BlockedPackage::new(
+            "cargo",
+            "serde",
+            "1.0.1",
+            "test-security",
+        )
+        .with_reason("Known vulnerability")]));
 
     let state = create_test_state_with_plugins(vec![cargo_plugin], vec![security_plugin]).await;
-    let (addr, _shutdown) = run_test_server_with_state(state).await;
+    let (addr, _shutdown) = run_test_server(state).await;
 
     let client = reqwest::Client::new();
     let response = client
@@ -512,9 +484,11 @@ async fn test_cargo_index_filters_blocked_versions() {
 async fn test_npm_blocked_package_download_returns_403() {
     let mock_server = MockServer::start().await;
 
+    // Upstream mock should never be called for blocked packages
     Mock::given(method("GET"))
         .and(path_regex("/lodash/-/.*"))
         .respond_with(ResponseTemplate::new(200).set_body_bytes("package content"))
+        .expect(0)
         .mount(&mock_server)
         .await;
 
@@ -525,21 +499,22 @@ async fn test_npm_blocked_package_download_returns_403() {
     };
     let npm_plugin: Arc<dyn RegistryPlugin> = Arc::new(NpmPlugin::with_config(npm_config));
 
-    let security_plugin: Arc<dyn SecuritySourcePlugin> = Arc::new(TestSecurityPlugin::new(vec![
-        BlockedPackage::new("npm", "lodash", "4.17.20", "test-security")
-            .with_reason("Prototype pollution vulnerability")
-            .with_severity(Severity::Critical),
-    ]));
+    let security_plugin: Arc<dyn SecuritySourcePlugin> =
+        Arc::new(TestSecurityPlugin::new(vec![BlockedPackage::new(
+            "npm",
+            "lodash",
+            "4.17.20",
+            "test-security",
+        )
+        .with_reason("Prototype pollution vulnerability")
+        .with_severity(Severity::Critical)]));
 
     let state = create_test_state_with_plugins(vec![npm_plugin], vec![security_plugin]).await;
-    let (addr, _shutdown) = run_test_server_with_state(state).await;
+    let (addr, _shutdown) = run_test_server(state).await;
 
     let client = reqwest::Client::new();
     let response = client
-        .get(format!(
-            "http://{}/npm/lodash/-/lodash-4.17.20.tgz",
-            addr
-        ))
+        .get(format!("http://{}/npm/lodash/-/lodash-4.17.20.tgz", addr))
         .send()
         .await
         .expect("Failed to send request");
@@ -591,13 +566,17 @@ async fn test_npm_metadata_filters_blocked_versions() {
     };
     let npm_plugin: Arc<dyn RegistryPlugin> = Arc::new(NpmPlugin::with_config(npm_config));
 
-    let security_plugin: Arc<dyn SecuritySourcePlugin> = Arc::new(TestSecurityPlugin::new(vec![
-        BlockedPackage::new("npm", "lodash", "4.17.20", "test-security")
-            .with_reason("Prototype pollution"),
-    ]));
+    let security_plugin: Arc<dyn SecuritySourcePlugin> =
+        Arc::new(TestSecurityPlugin::new(vec![BlockedPackage::new(
+            "npm",
+            "lodash",
+            "4.17.20",
+            "test-security",
+        )
+        .with_reason("Prototype pollution")]));
 
     let state = create_test_state_with_plugins(vec![npm_plugin], vec![security_plugin]).await;
-    let (addr, _shutdown) = run_test_server_with_state(state).await;
+    let (addr, _shutdown) = run_test_server(state).await;
 
     let client = reqwest::Client::new();
     let response = client
@@ -612,12 +591,18 @@ async fn test_npm_metadata_filters_blocked_versions() {
 
     // Check versions object
     let versions = json["versions"].as_object().unwrap();
-    assert!(versions.contains_key("4.17.19"), "Safe version should remain");
+    assert!(
+        versions.contains_key("4.17.19"),
+        "Safe version should remain"
+    );
     assert!(
         !versions.contains_key("4.17.20"),
         "Blocked version should be filtered"
     );
-    assert!(versions.contains_key("4.17.21"), "Safe version should remain");
+    assert!(
+        versions.contains_key("4.17.21"),
+        "Safe version should remain"
+    );
 }
 
 /// Test: npm scoped package (@scope/package) is correctly parsed
@@ -639,18 +624,14 @@ async fn test_npm_scoped_package_download() {
     let npm_plugin: Arc<dyn RegistryPlugin> = Arc::new(NpmPlugin::with_config(npm_config));
 
     // No blocked packages
-    let security_plugin: Arc<dyn SecuritySourcePlugin> =
-        Arc::new(TestSecurityPlugin::new(vec![]));
+    let security_plugin: Arc<dyn SecuritySourcePlugin> = Arc::new(TestSecurityPlugin::new(vec![]));
 
     let state = create_test_state_with_plugins(vec![npm_plugin], vec![security_plugin]).await;
-    let (addr, _shutdown) = run_test_server_with_state(state).await;
+    let (addr, _shutdown) = run_test_server(state).await;
 
     let client = reqwest::Client::new();
     let response = client
-        .get(format!(
-            "http://{}/npm/@types/node/-/node-18.0.0.tgz",
-            addr
-        ))
+        .get(format!("http://{}/npm/@types/node/-/node-18.0.0.tgz", addr))
         .send()
         .await
         .expect("Failed to send request");
@@ -671,9 +652,11 @@ async fn test_npm_scoped_package_download() {
 async fn test_docker_blocked_image_manifest_returns_403() {
     let mock_server = MockServer::start().await;
 
+    // Upstream mock should never be called for blocked image tags
     Mock::given(method("GET"))
         .and(path_regex("/v2/library/alpine/manifests/.*"))
         .respond_with(ResponseTemplate::new(200).set_body_bytes("manifest content"))
+        .expect(0)
         .mount(&mock_server)
         .await;
 
@@ -685,21 +668,22 @@ async fn test_docker_blocked_image_manifest_returns_403() {
     };
     let docker_plugin: Arc<dyn RegistryPlugin> = Arc::new(DockerPlugin::with_config(docker_config));
 
-    let security_plugin: Arc<dyn SecuritySourcePlugin> = Arc::new(TestSecurityPlugin::new(vec![
-        BlockedPackage::new("docker", "library/alpine", "3.14", "test-security")
-            .with_reason("Known CVE")
-            .with_severity(Severity::High),
-    ]));
+    let security_plugin: Arc<dyn SecuritySourcePlugin> =
+        Arc::new(TestSecurityPlugin::new(vec![BlockedPackage::new(
+            "docker",
+            "library/alpine",
+            "3.14",
+            "test-security",
+        )
+        .with_reason("Known CVE")
+        .with_severity(Severity::High)]));
 
     let state = create_test_state_with_plugins(vec![docker_plugin], vec![security_plugin]).await;
-    let (addr, _shutdown) = run_test_server_with_state(state).await;
+    let (addr, _shutdown) = run_test_server(state).await;
 
     let client = reqwest::Client::new();
     let response = client
-        .get(format!(
-            "http://{}/v2/library/alpine/manifests/3.14",
-            addr
-        ))
+        .get(format!("http://{}/v2/library/alpine/manifests/3.14", addr))
         .send()
         .await
         .expect("Failed to send request");
@@ -737,13 +721,17 @@ async fn test_docker_tag_list_filters_blocked_tags() {
     };
     let docker_plugin: Arc<dyn RegistryPlugin> = Arc::new(DockerPlugin::with_config(docker_config));
 
-    let security_plugin: Arc<dyn SecuritySourcePlugin> = Arc::new(TestSecurityPlugin::new(vec![
-        BlockedPackage::new("docker", "library/alpine", "3.14", "test-security")
-            .with_reason("Known CVE"),
-    ]));
+    let security_plugin: Arc<dyn SecuritySourcePlugin> =
+        Arc::new(TestSecurityPlugin::new(vec![BlockedPackage::new(
+            "docker",
+            "library/alpine",
+            "3.14",
+            "test-security",
+        )
+        .with_reason("Known CVE")]));
 
     let state = create_test_state_with_plugins(vec![docker_plugin], vec![security_plugin]).await;
-    let (addr, _shutdown) = run_test_server_with_state(state).await;
+    let (addr, _shutdown) = run_test_server(state).await;
 
     let client = reqwest::Client::new();
     let response = client
@@ -787,13 +775,17 @@ async fn test_docker_digest_pull_is_allowed() {
     let docker_plugin: Arc<dyn RegistryPlugin> = Arc::new(DockerPlugin::with_config(docker_config));
 
     // Even with blocking, digest pulls should work
-    let security_plugin: Arc<dyn SecuritySourcePlugin> = Arc::new(TestSecurityPlugin::new(vec![
-        BlockedPackage::new("docker", "library/alpine", "3.14", "test-security")
-            .with_reason("Known CVE"),
-    ]));
+    let security_plugin: Arc<dyn SecuritySourcePlugin> =
+        Arc::new(TestSecurityPlugin::new(vec![BlockedPackage::new(
+            "docker",
+            "library/alpine",
+            "3.14",
+            "test-security",
+        )
+        .with_reason("Known CVE")]));
 
     let state = create_test_state_with_plugins(vec![docker_plugin], vec![security_plugin]).await;
-    let (addr, _shutdown) = run_test_server_with_state(state).await;
+    let (addr, _shutdown) = run_test_server(state).await;
 
     let client = reqwest::Client::new();
     let response = client
@@ -824,8 +816,8 @@ async fn test_multiple_registries_with_filtering() {
     let mock_npm = MockServer::start().await;
 
     Mock::given(method("GET"))
-        .and(path_regex("/packages/.*"))
-        .respond_with(ResponseTemplate::new(200).set_body_bytes("pypi content"))
+        .and(path("/packages/ab/cd/requests-2.32.0.tar.gz"))
+        .respond_with(ResponseTemplate::new(200).set_body_bytes("safe pypi content"))
         .mount(&mock_pypi)
         .await;
 
@@ -854,12 +846,9 @@ async fn test_multiple_registries_with_filtering() {
             .with_reason("npm vulnerability"),
     ]));
 
-    let state = create_test_state_with_plugins(
-        vec![pypi_plugin, npm_plugin],
-        vec![security_plugin],
-    )
-    .await;
-    let (addr, _shutdown) = run_test_server_with_state(state).await;
+    let state =
+        create_test_state_with_plugins(vec![pypi_plugin, npm_plugin], vec![security_plugin]).await;
+    let (addr, _shutdown) = run_test_server(state).await;
 
     let client = reqwest::Client::new();
 
@@ -876,10 +865,7 @@ async fn test_multiple_registries_with_filtering() {
 
     // npm blocked request
     let response = client
-        .get(format!(
-            "http://{}/npm/lodash/-/lodash-4.17.20.tgz",
-            addr
-        ))
+        .get(format!("http://{}/npm/lodash/-/lodash-4.17.20.tgz", addr))
         .send()
         .await
         .unwrap();
@@ -894,6 +880,9 @@ async fn test_multiple_registries_with_filtering() {
         .send()
         .await
         .unwrap();
-    // May return 404 from mock, but not 403
-    assert_ne!(response.status(), StatusCode::FORBIDDEN);
+    assert_eq!(
+        response.status(),
+        StatusCode::OK,
+        "Safe package should be proxied successfully"
+    );
 }

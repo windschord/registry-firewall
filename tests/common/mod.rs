@@ -7,6 +7,8 @@ use std::sync::Arc;
 use registry_firewall::auth::{AuthConfig, AuthManager, RateLimitConfig};
 use registry_firewall::config::ServerConfig;
 use registry_firewall::database::{Database, SqliteDatabase};
+use registry_firewall::plugins::registry::RegistryPlugin;
+use registry_firewall::plugins::security::traits::SecuritySourcePlugin;
 use registry_firewall::server::{AppState, Server};
 
 /// Create an in-memory database for testing
@@ -55,6 +57,23 @@ pub async fn create_test_state() -> AppState<SqliteDatabase> {
     }
 }
 
+/// Create a test application state with plugins
+pub async fn create_test_state_with_plugins(
+    registry_plugins: Vec<Arc<dyn RegistryPlugin>>,
+    security_plugins: Vec<Arc<dyn SecuritySourcePlugin>>,
+) -> AppState<SqliteDatabase> {
+    let database = create_test_database().await;
+    let auth_manager = create_test_auth_manager(Arc::clone(&database));
+
+    AppState {
+        auth_manager,
+        database,
+        registry_plugins,
+        security_plugins,
+        cache_plugin: None,
+    }
+}
+
 /// Create a test server configuration with a random port
 pub fn create_test_server_config() -> ServerConfig {
     ServerConfig {
@@ -98,8 +117,26 @@ pub async fn run_test_server(
             .expect("Server error");
     });
 
-    // Give the server a moment to start (100ms is sufficient for slow CI systems)
-    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    // Wait for server to be ready via health check polling
+    wait_for_server_ready(addr).await;
 
     (addr, shutdown_tx)
+}
+
+/// Wait for the test server to become ready by polling the health endpoint
+async fn wait_for_server_ready(addr: std::net::SocketAddr) {
+    let client = reqwest::Client::new();
+    for _ in 0..50 {
+        if client
+            .get(format!("http://{}/health", addr))
+            .send()
+            .await
+            .map(|r| r.status().is_success())
+            .unwrap_or(false)
+        {
+            return;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+    }
+    panic!("Server failed to become ready within 500ms");
 }

@@ -177,6 +177,7 @@ async fn test_npm_metadata_proxied_to_upstream() {
                 .set_body_string(upstream_json)
                 .insert_header("content-type", "application/json"),
         )
+        .expect(1)
         .mount(&mock_server)
         .await;
 
@@ -212,6 +213,7 @@ async fn test_npm_tarball_proxied_to_upstream() {
                 .set_body_bytes("fake-tarball-content")
                 .insert_header("content-type", "application/gzip"),
         )
+        .expect(1)
         .mount(&mock_server)
         .await;
 

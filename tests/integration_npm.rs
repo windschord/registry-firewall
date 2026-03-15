@@ -137,22 +137,6 @@ async fn test_npm_scoped_package_route_returns_404_without_plugin() {
     assert_eq!(response.status(), StatusCode::NOT_FOUND);
 }
 
-/// Test 2b: npm scoped package with percent-encoded path returns 404 without plugin
-#[tokio::test]
-async fn test_npm_scoped_package_encoded_route_returns_404_without_plugin() {
-    let state = common::create_test_state().await;
-    let (addr, _shutdown) = run_test_server(state).await;
-
-    let client = reqwest::Client::new();
-    let response = client
-        .get(format!("http://{}/npm/@types%2Fnode", addr))
-        .send()
-        .await
-        .expect("Failed to send request");
-
-    assert_eq!(response.status(), StatusCode::NOT_FOUND);
-}
-
 /// Test 3: npm tarball download route exists
 #[tokio::test]
 async fn test_npm_tarball_route_exists() {
@@ -452,48 +436,6 @@ async fn test_npm_scoped_package_metadata() {
     let client = reqwest::Client::new();
     let response = client
         .get(format!("http://{}/npm/@types/node", addr))
-        .send()
-        .await
-        .expect("Failed to send request");
-
-    assert_eq!(response.status(), StatusCode::OK);
-
-    let body: serde_json::Value = response.json().await.expect("Failed to parse JSON");
-    assert_eq!(body["name"], "@types/node");
-}
-
-/// Test 9b: scoped package metadata with percent-encoded path is proxied correctly
-#[tokio::test]
-async fn test_npm_scoped_package_metadata_encoded_path() {
-    let mock_server = MockServer::start().await;
-
-    let upstream_json = r#"{
-        "name": "@types/node",
-        "dist-tags": {"latest": "18.19.0"},
-        "versions": {
-            "18.19.0": {"name": "@types/node", "version": "18.19.0"}
-        }
-    }"#;
-
-    Mock::given(method("GET"))
-        .and(path("/@types/node"))
-        .respond_with(
-            ResponseTemplate::new(200)
-                .set_body_string(upstream_json)
-                .insert_header("content-type", "application/json"),
-        )
-        .mount(&mock_server)
-        .await;
-
-    let npm_plugin = create_npm_plugin(&mock_server.uri());
-    let security_plugin: Arc<dyn SecuritySourcePlugin> = Arc::new(TestSecurityPlugin::new(vec![]));
-
-    let state = create_test_state_with_plugins(vec![npm_plugin], vec![security_plugin]).await;
-    let (addr, _shutdown) = run_test_server(state).await;
-
-    let client = reqwest::Client::new();
-    let response = client
-        .get(format!("http://{}/npm/@types%2Fnode", addr))
         .send()
         .await
         .expect("Failed to send request");

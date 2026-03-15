@@ -295,9 +295,11 @@ async fn test_npm_blocked_tarball_returns_403() {
 
     let (addr, _shutdown) = setup_npm_test_server(
         &mock_server.uri(),
-        vec![BlockedPackage::new("npm", "event-stream", "3.3.6", "test-security")
-            .with_reason("Malicious package - cryptocurrency theft")
-            .with_severity(Severity::Critical)],
+        vec![
+            BlockedPackage::new("npm", "event-stream", "3.3.6", "test-security")
+                .with_reason("Malicious package - cryptocurrency theft")
+                .with_severity(Severity::Critical),
+        ],
     )
     .await;
 
@@ -334,8 +336,10 @@ async fn test_npm_non_blocked_version_passes_through() {
 
     let (addr, _shutdown) = setup_npm_test_server(
         &mock_server.uri(),
-        vec![BlockedPackage::new("npm", "event-stream", "3.3.6", "test-security")
-            .with_reason("Malicious package")],
+        vec![
+            BlockedPackage::new("npm", "event-stream", "3.3.6", "test-security")
+                .with_reason("Malicious package"),
+        ],
     )
     .await;
 
@@ -386,8 +390,10 @@ async fn test_npm_metadata_filters_blocked_versions() {
 
     let (addr, _shutdown) = setup_npm_test_server(
         &mock_server.uri(),
-        vec![BlockedPackage::new("npm", "ua-parser-js", "0.7.29", "test-security")
-            .with_reason("Supply chain attack - cryptominer injection")],
+        vec![
+            BlockedPackage::new("npm", "ua-parser-js", "0.7.29", "test-security")
+                .with_reason("Supply chain attack - cryptominer injection"),
+        ],
     )
     .await;
 
@@ -577,8 +583,10 @@ async fn test_npm_dist_tags_updated_when_latest_blocked() {
 
     let (addr, _shutdown) = setup_npm_test_server(
         &mock_server.uri(),
-        vec![BlockedPackage::new("npm", "colors", "1.4.1", "test-security")
-            .with_reason("Sabotaged version - infinite loop")],
+        vec![
+            BlockedPackage::new("npm", "colors", "1.4.1", "test-security")
+                .with_reason("Sabotaged version - infinite loop"),
+        ],
     )
     .await;
 
@@ -630,7 +638,12 @@ async fn test_npm_dist_tags_selects_semver_highest_remaining_version() {
 
     let (addr, _shutdown) = setup_npm_test_server(
         &mock_server.uri(),
-        vec![BlockedPackage::new("npm", "semver-case", "1.11.0", "test-security")],
+        vec![BlockedPackage::new(
+            "npm",
+            "semver-case",
+            "1.11.0",
+            "test-security",
+        )],
     )
     .await;
 

@@ -417,8 +417,9 @@ async fn test_npm_scoped_package_metadata() {
         }
     }"#;
 
+    // Use path_regex to accept both unencoded and percent-encoded scoped paths
     Mock::given(method("GET"))
-        .and(path("/@types/node"))
+        .and(path_regex(r"^/@types(?:/|%2F)node$"))
         .respond_with(
             ResponseTemplate::new(200)
                 .set_body_string(upstream_json)
@@ -451,8 +452,9 @@ async fn test_npm_scoped_package_metadata() {
 async fn test_npm_scoped_package_tarball() {
     let mock_server = MockServer::start().await;
 
+    // Use path_regex to accept both unencoded and percent-encoded scoped paths
     Mock::given(method("GET"))
-        .and(path("/@types/node/-/node-18.19.0.tgz"))
+        .and(path_regex(r"^/@types(?:/|%2F)node/-/node-18\.19\.0\.tgz$"))
         .respond_with(ResponseTemplate::new(200).set_body_bytes("scoped-tarball-content"))
         .mount(&mock_server)
         .await;

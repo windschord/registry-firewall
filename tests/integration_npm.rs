@@ -233,9 +233,9 @@ async fn test_npm_tarball_proxied_to_upstream() {
     assert_eq!(body.as_ref(), b"fake-tarball-content");
 }
 
-/// Test 5b: upstream 500 error is handled gracefully
+/// Test 5b: upstream 500 error returns error status to client
 #[tokio::test]
-async fn test_npm_upstream_server_error_returns_bad_gateway() {
+async fn test_npm_upstream_server_error_returns_error_status() {
     let mock_server = MockServer::start().await;
 
     Mock::given(method("GET"))

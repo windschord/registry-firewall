@@ -100,6 +100,18 @@ fn create_npm_plugin(upstream_uri: &str) -> Arc<dyn RegistryPlugin> {
     Arc::new(NpmPlugin::with_config(config))
 }
 
+/// Helper to set up a test server with npm plugin and optional blocked packages
+async fn setup_npm_test_server(
+    mock_server_uri: &str,
+    blocked_packages: Vec<BlockedPackage>,
+) -> (std::net::SocketAddr, tokio::sync::oneshot::Sender<()>) {
+    let npm_plugin = create_npm_plugin(mock_server_uri);
+    let security_plugin: Arc<dyn SecuritySourcePlugin> =
+        Arc::new(TestSecurityPlugin::new(blocked_packages));
+    let state = create_test_state_with_plugins(vec![npm_plugin], vec![security_plugin]).await;
+    run_test_server(state).await
+}
+
 // =============================================================================
 // Route existence tests
 // =============================================================================
@@ -181,11 +193,7 @@ async fn test_npm_metadata_proxied_to_upstream() {
         .mount(&mock_server)
         .await;
 
-    let npm_plugin = create_npm_plugin(&mock_server.uri());
-    let security_plugin: Arc<dyn SecuritySourcePlugin> = Arc::new(TestSecurityPlugin::new(vec![]));
-
-    let state = create_test_state_with_plugins(vec![npm_plugin], vec![security_plugin]).await;
-    let (addr, _shutdown) = run_test_server(state).await;
+    let (addr, _shutdown) = setup_npm_test_server(&mock_server.uri(), vec![]).await;
 
     let client = reqwest::Client::new();
     let response = client
@@ -217,11 +225,7 @@ async fn test_npm_tarball_proxied_to_upstream() {
         .mount(&mock_server)
         .await;
 
-    let npm_plugin = create_npm_plugin(&mock_server.uri());
-    let security_plugin: Arc<dyn SecuritySourcePlugin> = Arc::new(TestSecurityPlugin::new(vec![]));
-
-    let state = create_test_state_with_plugins(vec![npm_plugin], vec![security_plugin]).await;
-    let (addr, _shutdown) = run_test_server(state).await;
+    let (addr, _shutdown) = setup_npm_test_server(&mock_server.uri(), vec![]).await;
 
     let client = reqwest::Client::new();
     let response = client
@@ -247,11 +251,7 @@ async fn test_npm_upstream_server_error_returns_error_status() {
         .mount(&mock_server)
         .await;
 
-    let npm_plugin = create_npm_plugin(&mock_server.uri());
-    let security_plugin: Arc<dyn SecuritySourcePlugin> = Arc::new(TestSecurityPlugin::new(vec![]));
-
-    let state = create_test_state_with_plugins(vec![npm_plugin], vec![security_plugin]).await;
-    let (addr, _shutdown) = run_test_server(state).await;
+    let (addr, _shutdown) = setup_npm_test_server(&mock_server.uri(), vec![]).await;
 
     let client = reqwest::Client::new();
     let response = client
@@ -285,20 +285,13 @@ async fn test_npm_blocked_tarball_returns_403() {
         .mount(&mock_server)
         .await;
 
-    let npm_plugin = create_npm_plugin(&mock_server.uri());
-
-    let security_plugin: Arc<dyn SecuritySourcePlugin> =
-        Arc::new(TestSecurityPlugin::new(vec![BlockedPackage::new(
-            "npm",
-            "event-stream",
-            "3.3.6",
-            "test-security",
-        )
-        .with_reason("Malicious package - cryptocurrency theft")
-        .with_severity(Severity::Critical)]));
-
-    let state = create_test_state_with_plugins(vec![npm_plugin], vec![security_plugin]).await;
-    let (addr, _shutdown) = run_test_server(state).await;
+    let (addr, _shutdown) = setup_npm_test_server(
+        &mock_server.uri(),
+        vec![BlockedPackage::new("npm", "event-stream", "3.3.6", "test-security")
+            .with_reason("Malicious package - cryptocurrency theft")
+            .with_severity(Severity::Critical)],
+    )
+    .await;
 
     let client = reqwest::Client::new();
     let response = client
@@ -331,19 +324,12 @@ async fn test_npm_non_blocked_version_passes_through() {
         .mount(&mock_server)
         .await;
 
-    let npm_plugin = create_npm_plugin(&mock_server.uri());
-
-    let security_plugin: Arc<dyn SecuritySourcePlugin> =
-        Arc::new(TestSecurityPlugin::new(vec![BlockedPackage::new(
-            "npm",
-            "event-stream",
-            "3.3.6",
-            "test-security",
-        )
-        .with_reason("Malicious package")]));
-
-    let state = create_test_state_with_plugins(vec![npm_plugin], vec![security_plugin]).await;
-    let (addr, _shutdown) = run_test_server(state).await;
+    let (addr, _shutdown) = setup_npm_test_server(
+        &mock_server.uri(),
+        vec![BlockedPackage::new("npm", "event-stream", "3.3.6", "test-security")
+            .with_reason("Malicious package")],
+    )
+    .await;
 
     let client = reqwest::Client::new();
     let response = client
@@ -390,19 +376,12 @@ async fn test_npm_metadata_filters_blocked_versions() {
         .mount(&mock_server)
         .await;
 
-    let npm_plugin = create_npm_plugin(&mock_server.uri());
-
-    let security_plugin: Arc<dyn SecuritySourcePlugin> =
-        Arc::new(TestSecurityPlugin::new(vec![BlockedPackage::new(
-            "npm",
-            "ua-parser-js",
-            "0.7.29",
-            "test-security",
-        )
-        .with_reason("Supply chain attack - cryptominer injection")]));
-
-    let state = create_test_state_with_plugins(vec![npm_plugin], vec![security_plugin]).await;
-    let (addr, _shutdown) = run_test_server(state).await;
+    let (addr, _shutdown) = setup_npm_test_server(
+        &mock_server.uri(),
+        vec![BlockedPackage::new("npm", "ua-parser-js", "0.7.29", "test-security")
+            .with_reason("Supply chain attack - cryptominer injection")],
+    )
+    .await;
 
     let client = reqwest::Client::new();
     let response = client
@@ -476,11 +455,7 @@ async fn test_npm_scoped_package_metadata() {
         .mount(&mock_server)
         .await;
 
-    let npm_plugin = create_npm_plugin(&mock_server.uri());
-    let security_plugin: Arc<dyn SecuritySourcePlugin> = Arc::new(TestSecurityPlugin::new(vec![]));
-
-    let state = create_test_state_with_plugins(vec![npm_plugin], vec![security_plugin]).await;
-    let (addr, _shutdown) = run_test_server(state).await;
+    let (addr, _shutdown) = setup_npm_test_server(&mock_server.uri(), vec![]).await;
 
     let client = reqwest::Client::new();
     let response = client
@@ -507,11 +482,7 @@ async fn test_npm_scoped_package_tarball() {
         .mount(&mock_server)
         .await;
 
-    let npm_plugin = create_npm_plugin(&mock_server.uri());
-    let security_plugin: Arc<dyn SecuritySourcePlugin> = Arc::new(TestSecurityPlugin::new(vec![]));
-
-    let state = create_test_state_with_plugins(vec![npm_plugin], vec![security_plugin]).await;
-    let (addr, _shutdown) = run_test_server(state).await;
+    let (addr, _shutdown) = setup_npm_test_server(&mock_server.uri(), vec![]).await;
 
     let client = reqwest::Client::new();
     let response = client
@@ -541,20 +512,15 @@ async fn test_npm_blocked_scoped_package_returns_403() {
         .mount(&mock_server)
         .await;
 
-    let npm_plugin = create_npm_plugin(&mock_server.uri());
-
-    let security_plugin: Arc<dyn SecuritySourcePlugin> =
-        Arc::new(TestSecurityPlugin::new(vec![BlockedPackage::new(
-            "npm",
-            "@malicious/package",
-            "1.0.0",
-            "test-security",
-        )
-        .with_reason("Malicious scoped package")
-        .with_severity(Severity::Critical)]));
-
-    let state = create_test_state_with_plugins(vec![npm_plugin], vec![security_plugin]).await;
-    let (addr, _shutdown) = run_test_server(state).await;
+    let (addr, _shutdown) = setup_npm_test_server(
+        &mock_server.uri(),
+        vec![
+            BlockedPackage::new("npm", "@malicious/package", "1.0.0", "test-security")
+                .with_reason("Malicious scoped package")
+                .with_severity(Severity::Critical),
+        ],
+    )
+    .await;
 
     let client = reqwest::Client::new();
     let response = client
@@ -601,19 +567,12 @@ async fn test_npm_dist_tags_updated_when_latest_blocked() {
         .mount(&mock_server)
         .await;
 
-    let npm_plugin = create_npm_plugin(&mock_server.uri());
-
-    let security_plugin: Arc<dyn SecuritySourcePlugin> =
-        Arc::new(TestSecurityPlugin::new(vec![BlockedPackage::new(
-            "npm",
-            "colors",
-            "1.4.1",
-            "test-security",
-        )
-        .with_reason("Sabotaged version - infinite loop")]));
-
-    let state = create_test_state_with_plugins(vec![npm_plugin], vec![security_plugin]).await;
-    let (addr, _shutdown) = run_test_server(state).await;
+    let (addr, _shutdown) = setup_npm_test_server(
+        &mock_server.uri(),
+        vec![BlockedPackage::new("npm", "colors", "1.4.1", "test-security")
+            .with_reason("Sabotaged version - infinite loop")],
+    )
+    .await;
 
     let client = reqwest::Client::new();
     let response = client

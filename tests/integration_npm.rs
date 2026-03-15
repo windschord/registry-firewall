@@ -325,6 +325,7 @@ async fn test_npm_non_blocked_version_passes_through() {
     Mock::given(method("GET"))
         .and(path("/event-stream/-/event-stream-4.0.1.tgz"))
         .respond_with(ResponseTemplate::new(200).set_body_bytes("safe-tarball-content"))
+        .expect(1)
         .mount(&mock_server)
         .await;
 
@@ -353,6 +354,8 @@ async fn test_npm_non_blocked_version_passes_through() {
         .expect("Failed to send request");
 
     assert_eq!(response.status(), StatusCode::OK);
+    let body = response.bytes().await.expect("Failed to read body");
+    assert_eq!(body.as_ref(), b"safe-tarball-content");
 }
 
 /// Test 8: metadata filtering removes blocked versions from JSON

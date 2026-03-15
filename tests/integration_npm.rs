@@ -9,6 +9,7 @@
 mod common;
 
 use std::sync::Arc;
+use std::time::Duration;
 
 use reqwest::StatusCode;
 use wiremock::matchers::{method, path, path_regex};
@@ -55,20 +56,15 @@ impl SecuritySourcePlugin for TestSecurityPlugin {
     }
 
     async fn sync(&self) -> Result<SyncResult, SyncError> {
-        Ok(SyncResult {
-            source: "test-security".to_string(),
-            packages_updated: 0,
-            packages_removed: 0,
-            duration: std::time::Duration::from_millis(0),
-        })
+        Ok(SyncResult::success(self.blocked_packages.len() as u64))
     }
 
-    fn sync_interval(&self) -> std::time::Duration {
-        std::time::Duration::from_secs(3600)
+    fn sync_interval(&self) -> Duration {
+        Duration::from_secs(3600)
     }
 
     fn sync_status(&self) -> SyncStatus {
-        SyncStatus::Idle
+        SyncStatus::new("test-security").success(self.blocked_packages.len() as u64)
     }
 
     async fn check_package(
@@ -77,18 +73,21 @@ impl SecuritySourcePlugin for TestSecurityPlugin {
         package: &str,
         version: &str,
     ) -> Option<BlockReason> {
-        self.blocked_packages.iter().find_map(|bp| {
-            if bp.ecosystem == ecosystem && bp.name == package && bp.version == version {
-                Some(BlockReason {
-                    source: bp.source.clone(),
-                    reason: bp.reason.clone().unwrap_or_default(),
-                    severity: bp.severity.clone(),
-                    advisory_url: None,
-                })
-            } else {
-                None
-            }
-        })
+        self.blocked_packages
+            .iter()
+            .find(|p| p.ecosystem == ecosystem && p.package == package && p.version == version)
+            .map(|p| {
+                BlockReason::new("test-security", p.reason.clone().unwrap_or_default())
+                    .with_severity(p.severity.unwrap_or(Severity::High))
+            })
+    }
+
+    async fn get_blocked_packages(&self, ecosystem: &str) -> Vec<BlockedPackage> {
+        self.blocked_packages
+            .iter()
+            .filter(|p| p.ecosystem == ecosystem)
+            .cloned()
+            .collect()
     }
 }
 
@@ -146,10 +145,7 @@ async fn test_npm_tarball_route_exists() {
 
     let client = reqwest::Client::new();
     let response = client
-        .get(format!(
-            "http://{}/npm/lodash/-/lodash-4.17.21.tgz",
-            addr
-        ))
+        .get(format!("http://{}/npm/lodash/-/lodash-4.17.21.tgz", addr))
         .send()
         .await
         .expect("Failed to send request");
@@ -227,10 +223,7 @@ async fn test_npm_tarball_proxied_to_upstream() {
 
     let client = reqwest::Client::new();
     let response = client
-        .get(format!(
-            "http://{}/npm/express/-/express-4.18.2.tgz",
-            addr
-        ))
+        .get(format!("http://{}/npm/express/-/express-4.18.2.tgz", addr))
         .send()
         .await
         .expect("Failed to send request");
@@ -274,10 +267,7 @@ async fn test_npm_blocked_tarball_returns_403() {
 
     let client = reqwest::Client::new();
     let response = client
-        .get(format!(
-            "http://{}/npm/event-stream/-/event-stream-3.3.6.tgz",
-            addr
-        ))
+        .get(format!("http://{}/npm/event-stream/-/event-stream-3.3.6.tgz", addr))
         .send()
         .await
         .expect("Failed to send request");
@@ -298,9 +288,7 @@ async fn test_npm_non_blocked_version_passes_through() {
 
     Mock::given(method("GET"))
         .and(path("/event-stream/-/event-stream-4.0.1.tgz"))
-        .respond_with(
-            ResponseTemplate::new(200).set_body_bytes("safe-tarball-content"),
-        )
+        .respond_with(ResponseTemplate::new(200).set_body_bytes("safe-tarball-content"))
         .mount(&mock_server)
         .await;
 
@@ -320,10 +308,7 @@ async fn test_npm_non_blocked_version_passes_through() {
 
     let client = reqwest::Client::new();
     let response = client
-        .get(format!(
-            "http://{}/npm/event-stream/-/event-stream-4.0.1.tgz",
-            addr
-        ))
+        .get(format!("http://{}/npm/event-stream/-/event-stream-4.0.1.tgz", addr))
         .send()
         .await
         .expect("Failed to send request");
@@ -456,9 +441,7 @@ async fn test_npm_scoped_package_tarball() {
 
     Mock::given(method("GET"))
         .and(path("/@types/node/-/node-18.19.0.tgz"))
-        .respond_with(
-            ResponseTemplate::new(200).set_body_bytes("scoped-tarball-content"),
-        )
+        .respond_with(ResponseTemplate::new(200).set_body_bytes("scoped-tarball-content"))
         .mount(&mock_server)
         .await;
 
@@ -470,10 +453,7 @@ async fn test_npm_scoped_package_tarball() {
 
     let client = reqwest::Client::new();
     let response = client
-        .get(format!(
-            "http://{}/npm/@types/node/-/node-18.19.0.tgz",
-            addr
-        ))
+        .get(format!("http://{}/npm/@types/node/-/node-18.19.0.tgz", addr))
         .send()
         .await
         .expect("Failed to send request");
@@ -505,10 +485,7 @@ async fn test_npm_blocked_scoped_package_returns_403() {
 
     let client = reqwest::Client::new();
     let response = client
-        .get(format!(
-            "http://{}/npm/@malicious/package/-/package-1.0.0.tgz",
-            addr
-        ))
+        .get(format!("http://{}/npm/@malicious/package/-/package-1.0.0.tgz", addr))
         .send()
         .await
         .expect("Failed to send request");

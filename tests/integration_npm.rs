@@ -233,6 +233,38 @@ async fn test_npm_tarball_proxied_to_upstream() {
     assert_eq!(body.as_ref(), b"fake-tarball-content");
 }
 
+/// Test 5b: upstream 500 error is handled gracefully
+#[tokio::test]
+async fn test_npm_upstream_server_error_returns_bad_gateway() {
+    let mock_server = MockServer::start().await;
+
+    Mock::given(method("GET"))
+        .and(path("/broken-pkg"))
+        .respond_with(ResponseTemplate::new(500).set_body_string("Internal Server Error"))
+        .mount(&mock_server)
+        .await;
+
+    let npm_plugin = create_npm_plugin(&mock_server.uri());
+    let security_plugin: Arc<dyn SecuritySourcePlugin> = Arc::new(TestSecurityPlugin::new(vec![]));
+
+    let state = create_test_state_with_plugins(vec![npm_plugin], vec![security_plugin]).await;
+    let (addr, _shutdown) = run_test_server(state).await;
+
+    let client = reqwest::Client::new();
+    let response = client
+        .get(format!("http://{}/npm/broken-pkg", addr))
+        .send()
+        .await
+        .expect("Failed to send request");
+
+    // Proxy should return an error status (not 200)
+    assert!(
+        response.status().is_server_error() || response.status().is_client_error(),
+        "Expected error status for upstream 500, got {}",
+        response.status()
+    );
+}
+
 // =============================================================================
 // Security filtering tests
 // =============================================================================

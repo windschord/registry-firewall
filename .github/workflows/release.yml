@@ -22,6 +22,15 @@ jobs:
       - name: Cache cargo dependencies
         uses: Swatinem/rust-cache@v2
 
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Run clippy
+        run: cargo clippy --all-features -- -D warnings
+
+      - name: Build
+        run: cargo build --all-features
+
       - name: Run tests
         run: cargo test --all-features
 
@@ -46,18 +55,22 @@ jobs:
           fi
 
       - name: Generate release notes
-        id: notes
         run: |
           TAG="${GITHUB_REF#refs/tags/}"
-          PREV_TAG=$(git tag --sort=-v:refname | grep -v "$TAG" | head -n 1 || echo "")
+          PREV_TAG=$(git tag --sort=-v:refname | grep -F -x -v "$TAG" | head -n 1 || echo "")
           if [ -n "$PREV_TAG" ]; then
             echo "## Changes since $PREV_TAG" > release-notes.md
             echo "" >> release-notes.md
             git log --pretty=format:"- %s (%h)" "$PREV_TAG".."$TAG" >> release-notes.md
           else
+            TOTAL=$(git rev-list --count HEAD)
             echo "## Initial Release" > release-notes.md
             echo "" >> release-notes.md
-            git log --pretty=format:"- %s (%h)" >> release-notes.md
+            if [ "$TOTAL" -gt 50 ]; then
+              echo "_Showing latest 50 of $TOTAL commits:_" >> release-notes.md
+              echo "" >> release-notes.md
+            fi
+            git log --pretty=format:"- %s (%h)" -n 50 >> release-notes.md
           fi
 
       - name: Create GitHub Release
@@ -65,4 +78,3 @@ jobs:
         with:
           prerelease: ${{ steps.prerelease.outputs.is_prerelease }}
           body_path: release-notes.md
-          generate_release_notes: true

@@ -104,9 +104,9 @@ fn create_npm_plugin(upstream_uri: &str) -> Arc<dyn RegistryPlugin> {
 // Route existence tests
 // =============================================================================
 
-/// Test 1: npm package metadata route exists
+/// Test 1: npm package metadata route returns 404 without plugin
 #[tokio::test]
-async fn test_npm_metadata_route_exists() {
+async fn test_npm_metadata_route_returns_404_without_plugin() {
     let state = common::create_test_state().await;
     let (addr, _shutdown) = run_test_server(state).await;
 
@@ -121,15 +121,31 @@ async fn test_npm_metadata_route_exists() {
     assert_eq!(response.status(), StatusCode::NOT_FOUND);
 }
 
-/// Test 2: npm scoped package route exists
+/// Test 2: npm scoped package route returns 404 without plugin
 #[tokio::test]
-async fn test_npm_scoped_package_route_exists() {
+async fn test_npm_scoped_package_route_returns_404_without_plugin() {
     let state = common::create_test_state().await;
     let (addr, _shutdown) = run_test_server(state).await;
 
     let client = reqwest::Client::new();
     let response = client
         .get(format!("http://{}/npm/@types/node", addr))
+        .send()
+        .await
+        .expect("Failed to send request");
+
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
+}
+
+/// Test 2b: npm scoped package with percent-encoded path returns 404 without plugin
+#[tokio::test]
+async fn test_npm_scoped_package_encoded_route_returns_404_without_plugin() {
+    let state = common::create_test_state().await;
+    let (addr, _shutdown) = run_test_server(state).await;
+
+    let client = reqwest::Client::new();
+    let response = client
+        .get(format!("http://{}/npm/@types%2Fnode", addr))
         .send()
         .await
         .expect("Failed to send request");
@@ -377,10 +393,16 @@ async fn test_npm_metadata_filters_blocked_versions() {
 
     let body: serde_json::Value = response.json().await.expect("Failed to parse JSON");
 
-    // Blocked version should be removed
+    // Blocked version should be removed from versions
     assert!(
-        body["versions"]["0.7.29"].is_null(),
+        body["versions"].get("0.7.29").is_none(),
         "Blocked version 0.7.29 should be removed from versions"
+    );
+
+    // Blocked version should be removed from time
+    assert!(
+        body["time"].get("0.7.29").is_none(),
+        "Blocked version 0.7.29 should be removed from time"
     );
 
     // Non-blocked versions should remain
@@ -430,6 +452,48 @@ async fn test_npm_scoped_package_metadata() {
     let client = reqwest::Client::new();
     let response = client
         .get(format!("http://{}/npm/@types/node", addr))
+        .send()
+        .await
+        .expect("Failed to send request");
+
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let body: serde_json::Value = response.json().await.expect("Failed to parse JSON");
+    assert_eq!(body["name"], "@types/node");
+}
+
+/// Test 9b: scoped package metadata with percent-encoded path is proxied correctly
+#[tokio::test]
+async fn test_npm_scoped_package_metadata_encoded_path() {
+    let mock_server = MockServer::start().await;
+
+    let upstream_json = r#"{
+        "name": "@types/node",
+        "dist-tags": {"latest": "18.19.0"},
+        "versions": {
+            "18.19.0": {"name": "@types/node", "version": "18.19.0"}
+        }
+    }"#;
+
+    Mock::given(method("GET"))
+        .and(path("/@types/node"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_string(upstream_json)
+                .insert_header("content-type", "application/json"),
+        )
+        .mount(&mock_server)
+        .await;
+
+    let npm_plugin = create_npm_plugin(&mock_server.uri());
+    let security_plugin: Arc<dyn SecuritySourcePlugin> = Arc::new(TestSecurityPlugin::new(vec![]));
+
+    let state = create_test_state_with_plugins(vec![npm_plugin], vec![security_plugin]).await;
+    let (addr, _shutdown) = run_test_server(state).await;
+
+    let client = reqwest::Client::new();
+    let response = client
+        .get(format!("http://{}/npm/@types%2Fnode", addr))
         .send()
         .await
         .expect("Failed to send request");
@@ -563,7 +627,7 @@ async fn test_npm_dist_tags_updated_when_latest_blocked() {
     let body: serde_json::Value = response.json().await.expect("Failed to parse JSON");
 
     // Blocked version should be removed
-    assert!(body["versions"]["1.4.1"].is_null());
+    assert!(body["versions"].get("1.4.1").is_none());
 
     // dist-tags.latest should be updated to the highest remaining version
     assert_eq!(

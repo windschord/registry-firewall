@@ -137,9 +137,9 @@ async fn test_npm_scoped_package_route_returns_404_without_plugin() {
     assert_eq!(response.status(), StatusCode::NOT_FOUND);
 }
 
-/// Test 3: npm tarball download route exists
+/// Test 3: npm tarball download route returns 404 without plugin
 #[tokio::test]
-async fn test_npm_tarball_route_exists() {
+async fn test_npm_tarball_returns_404_without_plugin() {
     let state = common::create_test_state().await;
     let (addr, _shutdown) = run_test_server(state).await;
 
@@ -425,7 +425,17 @@ async fn test_npm_metadata_filters_blocked_versions() {
         "Blocked version 0.7.29 should be removed from time"
     );
 
-    // Non-blocked versions should remain
+    // Non-blocked versions should remain in time
+    assert!(
+        body["time"].get("0.7.28").is_some(),
+        "Non-blocked version 0.7.28 should remain in time"
+    );
+    assert!(
+        body["time"].get("0.7.31").is_some(),
+        "Non-blocked version 0.7.31 should remain in time"
+    );
+
+    // Non-blocked versions should remain in versions
     assert!(
         body["versions"]["0.7.28"].is_object(),
         "Non-blocked version 0.7.28 should remain"

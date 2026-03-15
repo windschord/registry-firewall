@@ -520,7 +520,7 @@ async fn test_npm_blocked_scoped_package_returns_403() {
 
     // Upstream should never be called for blocked packages
     Mock::given(method("GET"))
-        .and(path_regex("/@malicious/.*"))
+        .and(path_regex(r"^/@malicious(?:/|%2F).*"))
         .respond_with(ResponseTemplate::new(200))
         .expect(0)
         .mount(&mock_server)

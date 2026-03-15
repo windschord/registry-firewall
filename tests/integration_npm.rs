@@ -594,3 +594,50 @@ async fn test_npm_dist_tags_updated_when_latest_blocked() {
         "dist-tags.latest should be updated to 1.4.0 after blocking 1.4.1"
     );
 }
+
+/// Test 13: dist-tags selects correct semver highest version (not string comparison)
+#[tokio::test]
+async fn test_npm_dist_tags_selects_semver_highest_remaining_version() {
+    let mock_server = MockServer::start().await;
+
+    let upstream_json = r#"{
+        "name": "semver-case",
+        "dist-tags": {"latest": "1.11.0"},
+        "versions": {
+            "1.9.0": {"name": "semver-case", "version": "1.9.0"},
+            "1.10.0": {"name": "semver-case", "version": "1.10.0"},
+            "1.11.0": {"name": "semver-case", "version": "1.11.0"}
+        }
+    }"#;
+
+    Mock::given(method("GET"))
+        .and(path("/semver-case"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_string(upstream_json)
+                .insert_header("content-type", "application/json"),
+        )
+        .mount(&mock_server)
+        .await;
+
+    let (addr, _shutdown) = setup_npm_test_server(
+        &mock_server.uri(),
+        vec![BlockedPackage::new("npm", "semver-case", "1.11.0", "test-security")],
+    )
+    .await;
+
+    let client = reqwest::Client::new();
+    let response = client
+        .get(format!("http://{}/npm/semver-case", addr))
+        .send()
+        .await
+        .expect("Failed to send request");
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let body: serde_json::Value = response.json().await.expect("Failed to parse JSON");
+    // Should select 1.10.0 (semver highest), not 1.9.0 (string comparison would pick "1.9.0")
+    assert_eq!(
+        body["dist-tags"]["latest"], "1.10.0",
+        "dist-tags.latest should use semver comparison, not string comparison"
+    );
+}

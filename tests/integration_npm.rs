@@ -385,6 +385,7 @@ async fn test_npm_metadata_filters_blocked_versions() {
                 .set_body_string(upstream_json)
                 .insert_header("content-type", "application/json"),
         )
+        .expect(1)
         .mount(&mock_server)
         .await;
 
@@ -466,6 +467,7 @@ async fn test_npm_scoped_package_metadata() {
                 .set_body_string(upstream_json)
                 .insert_header("content-type", "application/json"),
         )
+        .expect(1)
         .mount(&mock_server)
         .await;
 
@@ -493,6 +495,7 @@ async fn test_npm_scoped_package_tarball() {
     Mock::given(method("GET"))
         .and(path_regex(r"^/@types(?:/|%2F)node/-/node-18\.19\.0\.tgz$"))
         .respond_with(ResponseTemplate::new(200).set_body_bytes("scoped-tarball-content"))
+        .expect(1)
         .mount(&mock_server)
         .await;
 
@@ -578,6 +581,7 @@ async fn test_npm_dist_tags_updated_when_latest_blocked() {
                 .set_body_string(upstream_json)
                 .insert_header("content-type", "application/json"),
         )
+        .expect(1)
         .mount(&mock_server)
         .await;
 
@@ -633,6 +637,7 @@ async fn test_npm_dist_tags_selects_semver_highest_remaining_version() {
                 .set_body_string(upstream_json)
                 .insert_header("content-type", "application/json"),
         )
+        .expect(1)
         .mount(&mock_server)
         .await;
 

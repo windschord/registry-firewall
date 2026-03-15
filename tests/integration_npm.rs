@@ -241,6 +241,7 @@ async fn test_npm_upstream_server_error_returns_error_status() {
     Mock::given(method("GET"))
         .and(path("/broken-pkg"))
         .respond_with(ResponseTemplate::new(500).set_body_string("Internal Server Error"))
+        .expect(1)
         .mount(&mock_server)
         .await;
 
@@ -257,10 +258,10 @@ async fn test_npm_upstream_server_error_returns_error_status() {
         .await
         .expect("Failed to send request");
 
-    // Proxy should return an error status (not 200)
+    // Proxy should return a server error status for upstream 500
     assert!(
-        response.status().is_server_error() || response.status().is_client_error(),
-        "Expected error status for upstream 500, got {}",
+        response.status().is_server_error(),
+        "Expected server error status for upstream 500, got {}",
         response.status()
     );
 }
@@ -516,6 +517,14 @@ async fn test_npm_scoped_package_tarball() {
 #[tokio::test]
 async fn test_npm_blocked_scoped_package_returns_403() {
     let mock_server = MockServer::start().await;
+
+    // Upstream should never be called for blocked packages
+    Mock::given(method("GET"))
+        .and(path_regex("/@malicious/.*"))
+        .respond_with(ResponseTemplate::new(200))
+        .expect(0)
+        .mount(&mock_server)
+        .await;
 
     let npm_plugin = create_npm_plugin(&mock_server.uri());
 

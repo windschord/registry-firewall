@@ -28,11 +28,8 @@ RUN mkdir -p src && \
 
 # Build dependencies (this layer will be cached unless Cargo.toml/lock changes)
 RUN cargo build --release && \
-    rm -rf src \
-    target/release/registry-firewall* \
-    target/release/deps/registry_firewall* \
-    target/release/.fingerprint/registry-firewall-* \
-    target/release/.fingerprint/registry_firewall-*
+    cargo clean -p registry-firewall --release && \
+    rm -rf src
 
 # Copy the actual source code
 COPY src src/

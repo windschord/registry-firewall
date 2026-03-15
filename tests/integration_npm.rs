@@ -267,7 +267,10 @@ async fn test_npm_blocked_tarball_returns_403() {
 
     let client = reqwest::Client::new();
     let response = client
-        .get(format!("http://{}/npm/event-stream/-/event-stream-3.3.6.tgz", addr))
+        .get(format!(
+            "http://{}/npm/event-stream/-/event-stream-3.3.6.tgz",
+            addr
+        ))
         .send()
         .await
         .expect("Failed to send request");
@@ -308,7 +311,10 @@ async fn test_npm_non_blocked_version_passes_through() {
 
     let client = reqwest::Client::new();
     let response = client
-        .get(format!("http://{}/npm/event-stream/-/event-stream-4.0.1.tgz", addr))
+        .get(format!(
+            "http://{}/npm/event-stream/-/event-stream-4.0.1.tgz",
+            addr
+        ))
         .send()
         .await
         .expect("Failed to send request");
@@ -453,7 +459,10 @@ async fn test_npm_scoped_package_tarball() {
 
     let client = reqwest::Client::new();
     let response = client
-        .get(format!("http://{}/npm/@types/node/-/node-18.19.0.tgz", addr))
+        .get(format!(
+            "http://{}/npm/@types/node/-/node-18.19.0.tgz",
+            addr
+        ))
         .send()
         .await
         .expect("Failed to send request");
@@ -485,7 +494,10 @@ async fn test_npm_blocked_scoped_package_returns_403() {
 
     let client = reqwest::Client::new();
     let response = client
-        .get(format!("http://{}/npm/@malicious/package/-/package-1.0.0.tgz", addr))
+        .get(format!(
+            "http://{}/npm/@malicious/package/-/package-1.0.0.tgz",
+            addr
+        ))
         .send()
         .await
         .expect("Failed to send request");

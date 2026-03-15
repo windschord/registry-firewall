@@ -112,6 +112,14 @@ async fn setup_npm_test_server(
     run_test_server(state).await
 }
 
+/// Create an HTTP client with a bounded timeout to prevent CI hangs
+fn test_client() -> reqwest::Client {
+    reqwest::Client::builder()
+        .timeout(Duration::from_secs(30))
+        .build()
+        .expect("Failed to create test HTTP client")
+}
+
 // =============================================================================
 // Route existence tests
 // =============================================================================
@@ -122,7 +130,7 @@ async fn test_npm_metadata_route_returns_404_without_plugin() {
     let state = common::create_test_state().await;
     let (addr, _shutdown) = run_test_server(state).await;
 
-    let client = reqwest::Client::new();
+    let client = test_client();
     let response = client
         .get(format!("http://{}/npm/lodash", addr))
         .send()
@@ -139,7 +147,7 @@ async fn test_npm_scoped_package_route_returns_404_without_plugin() {
     let state = common::create_test_state().await;
     let (addr, _shutdown) = run_test_server(state).await;
 
-    let client = reqwest::Client::new();
+    let client = test_client();
     let response = client
         .get(format!("http://{}/npm/@types/node", addr))
         .send()
@@ -155,7 +163,7 @@ async fn test_npm_tarball_returns_404_without_plugin() {
     let state = common::create_test_state().await;
     let (addr, _shutdown) = run_test_server(state).await;
 
-    let client = reqwest::Client::new();
+    let client = test_client();
     let response = client
         .get(format!("http://{}/npm/lodash/-/lodash-4.17.21.tgz", addr))
         .send()
@@ -195,7 +203,7 @@ async fn test_npm_metadata_proxied_to_upstream() {
 
     let (addr, _shutdown) = setup_npm_test_server(&mock_server.uri(), vec![]).await;
 
-    let client = reqwest::Client::new();
+    let client = test_client();
     let response = client
         .get(format!("http://{}/npm/express", addr))
         .send()
@@ -227,7 +235,7 @@ async fn test_npm_tarball_proxied_to_upstream() {
 
     let (addr, _shutdown) = setup_npm_test_server(&mock_server.uri(), vec![]).await;
 
-    let client = reqwest::Client::new();
+    let client = test_client();
     let response = client
         .get(format!("http://{}/npm/express/-/express-4.18.2.tgz", addr))
         .send()
@@ -253,7 +261,7 @@ async fn test_npm_upstream_server_error_returns_error_status() {
 
     let (addr, _shutdown) = setup_npm_test_server(&mock_server.uri(), vec![]).await;
 
-    let client = reqwest::Client::new();
+    let client = test_client();
     let response = client
         .get(format!("http://{}/npm/broken-pkg", addr))
         .send()
@@ -293,7 +301,7 @@ async fn test_npm_blocked_tarball_returns_403() {
     )
     .await;
 
-    let client = reqwest::Client::new();
+    let client = test_client();
     let response = client
         .get(format!(
             "http://{}/npm/event-stream/-/event-stream-3.3.6.tgz",
@@ -331,7 +339,7 @@ async fn test_npm_non_blocked_version_passes_through() {
     )
     .await;
 
-    let client = reqwest::Client::new();
+    let client = test_client();
     let response = client
         .get(format!(
             "http://{}/npm/event-stream/-/event-stream-4.0.1.tgz",
@@ -383,7 +391,7 @@ async fn test_npm_metadata_filters_blocked_versions() {
     )
     .await;
 
-    let client = reqwest::Client::new();
+    let client = test_client();
     let response = client
         .get(format!("http://{}/npm/ua-parser-js", addr))
         .send()
@@ -457,7 +465,7 @@ async fn test_npm_scoped_package_metadata() {
 
     let (addr, _shutdown) = setup_npm_test_server(&mock_server.uri(), vec![]).await;
 
-    let client = reqwest::Client::new();
+    let client = test_client();
     let response = client
         .get(format!("http://{}/npm/@types/node", addr))
         .send()
@@ -484,7 +492,7 @@ async fn test_npm_scoped_package_tarball() {
 
     let (addr, _shutdown) = setup_npm_test_server(&mock_server.uri(), vec![]).await;
 
-    let client = reqwest::Client::new();
+    let client = test_client();
     let response = client
         .get(format!(
             "http://{}/npm/@types/node/-/node-18.19.0.tgz",
@@ -522,7 +530,7 @@ async fn test_npm_blocked_scoped_package_returns_403() {
     )
     .await;
 
-    let client = reqwest::Client::new();
+    let client = test_client();
     let response = client
         .get(format!(
             "http://{}/npm/@malicious/package/-/package-1.0.0.tgz",
@@ -574,7 +582,7 @@ async fn test_npm_dist_tags_updated_when_latest_blocked() {
     )
     .await;
 
-    let client = reqwest::Client::new();
+    let client = test_client();
     let response = client
         .get(format!("http://{}/npm/colors", addr))
         .send()
@@ -626,7 +634,7 @@ async fn test_npm_dist_tags_selects_semver_highest_remaining_version() {
     )
     .await;
 
-    let client = reqwest::Client::new();
+    let client = test_client();
     let response = client
         .get(format!("http://{}/npm/semver-case", addr))
         .send()

@@ -64,21 +64,8 @@ impl Default for DashboardStats {
     }
 }
 
-/// Security source summary for dashboard
-#[cfg_attr(feature = "swagger-gen", derive(utoipa::ToSchema))]
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct SecuritySourceSummary {
-    /// Source name
-    pub name: String,
-    /// Supported ecosystems
-    pub ecosystems: Vec<String>,
-    /// Last sync time
-    pub last_sync: Option<chrono::DateTime<chrono::Utc>>,
-    /// Current status
-    pub status: String,
-    /// Number of records
-    pub records_count: u64,
-}
+/// Security source summary for dashboard (alias for SecuritySourceInfo)
+pub type SecuritySourceSummary = SecuritySourceInfo;
 
 /// Block logs query parameters
 #[cfg_attr(feature = "swagger-gen", derive(utoipa::ToSchema))]
@@ -116,10 +103,28 @@ pub struct BlockLogEntry {
     pub source: String,
     /// Block reason
     pub reason: Option<String>,
-    /// Client IP
+    /// Client IP (masked for privacy, e.g. "192.168.x.x")
     pub client_ip: Option<String>,
     /// Timestamp
     pub timestamp: chrono::DateTime<chrono::Utc>,
+}
+
+/// Mask an IP address for privacy (e.g., "192.168.1.100" -> "192.168.x.x")
+fn mask_ip(ip: &str) -> String {
+    if let Some(dot_pos) = ip.find('.') {
+        if let Some(second_dot) = ip[dot_pos + 1..].find('.') {
+            let prefix = &ip[..dot_pos + 1 + second_dot];
+            return format!("{}.x.x", prefix);
+        }
+    }
+    // IPv6 or unparseable: mask last half
+    if ip.contains(':') {
+        let parts: Vec<&str> = ip.split(':').collect();
+        let half = parts.len() / 2;
+        let prefix: Vec<&str> = parts[..half].to_vec();
+        return format!("{}:x:x:x", prefix.join(":"));
+    }
+    "x.x.x.x".to_string()
 }
 
 impl From<BlockLog> for BlockLogEntry {
@@ -131,7 +136,7 @@ impl From<BlockLog> for BlockLogEntry {
             version: log.version,
             source: log.source,
             reason: log.reason,
-            client_ip: log.client_ip,
+            client_ip: log.client_ip.as_deref().map(mask_ip),
             timestamp: log.timestamp,
         }
     }

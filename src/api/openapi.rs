@@ -8,8 +8,8 @@ use utoipa::OpenApi;
 use crate::api::types::{
     BlockLogEntry, BlockLogsQuery, BlockLogsResponse, CacheClearResponse, CacheStatsResponse,
     CreateTokenApiRequest, CreateTokenResponse, DashboardStats, ErrorResponse, MessageResponse,
-    RulesResponse, SecuritySourceInfo, SecuritySourceSummary, SecuritySourcesResponse,
-    SyncTriggerResponse, TokenInfo, TokensResponse,
+    RulesResponse, SecuritySourceInfo, SecuritySourcesResponse, SyncTriggerResponse, TokenInfo,
+    TokensResponse,
 };
 use crate::models::CustomRule;
 
@@ -37,7 +37,7 @@ use crate::models::CustomRule;
     ),
     components(
         schemas(
-            DashboardStats, SecuritySourceSummary, BlockLogsQuery, BlockLogsResponse,
+            DashboardStats, BlockLogsQuery, BlockLogsResponse,
             BlockLogEntry, SecuritySourcesResponse, SecuritySourceInfo, SyncTriggerResponse,
             CacheStatsResponse, CacheClearResponse, RulesResponse, TokensResponse,
             TokenInfo, CreateTokenResponse, MessageResponse, ErrorResponse,

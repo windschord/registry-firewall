@@ -117,12 +117,14 @@ fn mask_ip(ip: &str) -> String {
             return format!("{}.x.x", prefix);
         }
     }
-    // IPv6 or unparseable: mask last half
+    // IPv6 or unparseable: mask last half of segments
     if ip.contains(':') {
         let parts: Vec<&str> = ip.split(':').collect();
         let half = parts.len() / 2;
         let prefix: Vec<&str> = parts[..half].to_vec();
-        return format!("{}:x:x:x", prefix.join(":"));
+        let masked_count = parts.len() - half;
+        let mask = vec!["x"; masked_count].join(":");
+        return format!("{}:{}", prefix.join(":"), mask);
     }
     "x.x.x.x".to_string()
 }
@@ -406,5 +408,27 @@ mod tests {
         let deserialized: CacheStatsResponse = serde_json::from_str(&json).unwrap();
 
         assert_eq!(response, deserialized);
+    }
+
+    // Test: mask_ip with IPv4 addresses
+    #[test]
+    fn test_mask_ip_ipv4() {
+        assert_eq!(mask_ip("192.168.1.100"), "192.168.x.x");
+        assert_eq!(mask_ip("10.0.0.1"), "10.0.x.x");
+        assert_eq!(mask_ip("172.16.254.3"), "172.16.x.x");
+    }
+
+    // Test: mask_ip with IPv6 addresses
+    #[test]
+    fn test_mask_ip_ipv6() {
+        let masked = mask_ip("2001:db8:85a3:8d3:1319:8a2e:370:7348");
+        assert!(masked.starts_with("2001:db8:85a3:8d3:"));
+        assert!(masked.ends_with(":x:x:x:x"));
+    }
+
+    // Test: mask_ip with invalid input
+    #[test]
+    fn test_mask_ip_invalid() {
+        assert_eq!(mask_ip("invalid"), "x.x.x.x");
     }
 }

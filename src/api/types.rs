@@ -120,22 +120,22 @@ impl BlockLogEntry {
 
 /// Mask an IP address for privacy (e.g., "192.168.1.100" -> "192.168.x.x")
 fn mask_ip(ip: &str) -> String {
-    // Strict IPv4 validation: exactly 4 octets, each 0-255
-    let parts: Vec<&str> = ip.split('.').collect();
-    if parts.len() == 4 && parts.iter().all(|p| p.parse::<u8>().is_ok()) {
-        return format!("{}.{}.x.x", parts[0], parts[1]);
+    use std::net::IpAddr;
+    match ip.parse::<IpAddr>() {
+        Ok(IpAddr::V4(addr)) => {
+            let octets = addr.octets();
+            format!("{}.{}.x.x", octets[0], octets[1])
+        }
+        Ok(IpAddr::V6(addr)) => {
+            let segments = addr.segments();
+            let half = segments.len() / 2;
+            let prefix: Vec<String> = segments[..half].iter().map(|s| format!("{:x}", s)).collect();
+            let masked_count = segments.len() - half;
+            let mask = vec!["x"; masked_count].join(":");
+            format!("{}:{}", prefix.join(":"), mask)
+        }
+        Err(_) => "x.x.x.x".to_string(),
     }
-    // IPv6: mask last half of segments
-    if ip.contains(':') {
-        let segments: Vec<&str> = ip.split(':').collect();
-        let half = segments.len() / 2;
-        let prefix: Vec<&str> = segments[..half].to_vec();
-        let masked_count = segments.len() - half;
-        let mask = vec!["x"; masked_count].join(":");
-        return format!("{}:{}", prefix.join(":"), mask);
-    }
-    // Unparseable: fully mask
-    "x.x.x.x".to_string()
 }
 
 impl From<BlockLog> for BlockLogEntry {
@@ -439,7 +439,7 @@ mod tests {
     // Test: mask_ip with IPv6 addresses
     #[test]
     fn test_mask_ip_ipv6() {
-        let masked = mask_ip("2001:db8:85a3:8d3:1319:8a2e:370:7348");
+        let masked = mask_ip("2001:0db8:85a3:08d3:1319:8a2e:0370:7348");
         assert!(masked.starts_with("2001:db8:85a3:8d3:"));
         assert!(masked.ends_with(":x:x:x:x"));
     }
@@ -448,5 +448,33 @@ mod tests {
     #[test]
     fn test_mask_ip_invalid() {
         assert_eq!(mask_ip("invalid"), "x.x.x.x");
+    }
+
+    // Test: mask_ip with IPv6 compressed form
+    #[test]
+    fn test_mask_ip_ipv6_compressed() {
+        let masked = mask_ip("::1");
+        // ::1 expands to 0:0:0:0:0:0:0:1, first half preserved, last half masked
+        assert!(masked.starts_with("0:0:0:0:"));
+        assert!(masked.ends_with(":x:x:x:x"));
+    }
+
+    // Test: CreateTokenResponse Debug redacts token
+    #[test]
+    fn test_create_token_response_debug_redacts_token() {
+        let response = CreateTokenResponse {
+            id: "test-id".to_string(),
+            name: "test-name".to_string(),
+            token: "secret-token-value".to_string(),
+            created_at: Utc::now(),
+            expires_at: None,
+        };
+
+        let debug_output = format!("{:?}", response);
+
+        assert!(!debug_output.contains("secret-token-value"));
+        assert!(debug_output.contains("<redacted>"));
+        assert!(debug_output.contains("test-id"));
+        assert!(debug_output.contains("test-name"));
     }
 }

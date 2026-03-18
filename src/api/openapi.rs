@@ -65,13 +65,20 @@ impl utoipa::Modify for SecurityAddon {
             utoipa::openapi::ServerBuilder::new()
                 .url("{scheme}://{host}:{port}")
                 .description(Some("registry-firewall instance"))
-                .parameter("scheme", utoipa::openapi::ServerVariableBuilder::new()
-                    .default_value("http")
-                    .enum_values(Some(["http", "https"])))
-                .parameter("host", utoipa::openapi::ServerVariableBuilder::new()
-                    .default_value("localhost"))
-                .parameter("port", utoipa::openapi::ServerVariableBuilder::new()
-                    .default_value("8080"))
+                .parameter(
+                    "scheme",
+                    utoipa::openapi::ServerVariableBuilder::new()
+                        .default_value("http")
+                        .enum_values(Some(["http", "https"])),
+                )
+                .parameter(
+                    "host",
+                    utoipa::openapi::ServerVariableBuilder::new().default_value("localhost"),
+                )
+                .parameter(
+                    "port",
+                    utoipa::openapi::ServerVariableBuilder::new().default_value("8080"),
+                )
                 .build(),
         ]);
 

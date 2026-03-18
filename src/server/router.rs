@@ -27,6 +27,13 @@ use crate::api::{
     self, BlockLogsQuery, DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT, MAX_PATTERN_LENGTH,
     MAX_REASON_LENGTH, MAX_TOKEN_NAME_LENGTH,
 };
+#[cfg(feature = "swagger-gen")]
+use crate::api::{
+    BlockLogsResponse, CacheClearResponse, CacheStatsResponse, DashboardStats,
+    SecuritySourcesResponse,
+};
+#[cfg(feature = "swagger-gen")]
+use crate::models::CustomRule;
 
 /// Shared application state
 pub struct AppState<D: Database> {

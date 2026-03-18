@@ -129,7 +129,10 @@ fn mask_ip(ip: &str) -> String {
         Ok(IpAddr::V6(addr)) => {
             let segments = addr.segments();
             let half = segments.len() / 2;
-            let prefix: Vec<String> = segments[..half].iter().map(|s| format!("{:x}", s)).collect();
+            let prefix: Vec<String> = segments[..half]
+                .iter()
+                .map(|s| format!("{:x}", s))
+                .collect();
             let masked_count = segments.len() - half;
             let mask = vec!["x"; masked_count].join(":");
             format!("{}:{}", prefix.join(":"), mask)

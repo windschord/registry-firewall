@@ -74,9 +74,15 @@ clap = { version = "4", features = ["derive", "env"] }
 regex-lite = "0.1"
 glob = "0.3.3"
 
+# OpenAPI specification generation (optional, enabled by "swagger-gen" feature)
+utoipa = { version = "5", features = ["axum_extras", "chrono"], optional = true }
+utoipa-axum = { version = "0.2", optional = true }
+utoipa-swagger-ui = { version = "9", features = ["axum"], optional = true }
+
 [features]
 default = ["webui"]
 webui = ["dep:rust-embed", "dep:mime_guess"]
+swagger-gen = ["dep:utoipa", "dep:utoipa-axum", "dep:utoipa-swagger-ui"]
 
 [dev-dependencies]
 mockall = "0.12"

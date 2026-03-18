@@ -5,6 +5,8 @@
 
 pub mod types;
 pub mod handlers;
+#[cfg(feature = "swagger-gen")]
+pub mod openapi;
 
 pub use types::*;
 pub use handlers::*;

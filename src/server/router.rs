@@ -293,7 +293,16 @@ async fn registry_proxy_handler<D: Database + 'static>(
 // =============================================================================
 
 /// Dashboard API handler
-async fn api_dashboard_handler<D: Database + 'static>(
+#[cfg_attr(feature = "swagger-gen", utoipa::path(
+    get,
+    path = "/api/dashboard",
+    responses(
+        (status = 200, description = "Dashboard statistics", body = DashboardStats),
+    ),
+    security(("bearer_token" = []), ("basic_auth" = [])),
+    tag = "dashboard"
+))]
+pub(crate) async fn api_dashboard_handler<D: Database + 'static>(
     State(state): State<AppState<D>>,
 ) -> impl IntoResponse {
     let stats = api::build_dashboard_stats(
@@ -310,7 +319,20 @@ async fn api_dashboard_handler<D: Database + 'static>(
 /// Query parameters:
 /// - `limit`: Number of logs to return (default: 50, max: 1000)
 /// - `offset`: Pagination offset (default: 0)
-async fn api_blocks_handler<D: Database + 'static>(
+#[cfg_attr(feature = "swagger-gen", utoipa::path(
+    get,
+    path = "/api/blocks",
+    params(
+        ("limit" = Option<u32>, Query, description = "Number of logs to return"),
+        ("offset" = Option<u32>, Query, description = "Pagination offset"),
+    ),
+    responses(
+        (status = 200, description = "Block logs", body = BlockLogsResponse),
+    ),
+    security(("bearer_token" = []), ("basic_auth" = [])),
+    tag = "blocks"
+))]
+pub(crate) async fn api_blocks_handler<D: Database + 'static>(
     State(state): State<AppState<D>>,
     Query(query): Query<BlockLogsQuery>,
 ) -> impl IntoResponse {
@@ -338,7 +360,16 @@ async fn api_blocks_handler<D: Database + 'static>(
 }
 
 /// Security sources status API handler
-async fn api_security_sources_handler<D: Database + 'static>(
+#[cfg_attr(feature = "swagger-gen", utoipa::path(
+    get,
+    path = "/api/security-sources",
+    responses(
+        (status = 200, description = "Security sources list", body = SecuritySourcesResponse),
+    ),
+    security(("bearer_token" = []), ("basic_auth" = [])),
+    tag = "security-sources"
+))]
+pub(crate) async fn api_security_sources_handler<D: Database + 'static>(
     State(state): State<AppState<D>>,
 ) -> impl IntoResponse {
     let response = api::build_security_sources_response(&state.security_plugins);
@@ -346,7 +377,19 @@ async fn api_security_sources_handler<D: Database + 'static>(
 }
 
 /// Trigger sync for a security source
-async fn api_trigger_sync_handler<D: Database + 'static>(
+#[cfg_attr(feature = "swagger-gen", utoipa::path(
+    post,
+    path = "/api/security-sources/{name}/sync",
+    params(
+        ("name" = String, Path, description = "Security source name"),
+    ),
+    responses(
+        (status = 200, description = "Sync triggered"),
+    ),
+    security(("bearer_token" = []), ("basic_auth" = [])),
+    tag = "security-sources"
+))]
+pub(crate) async fn api_trigger_sync_handler<D: Database + 'static>(
     State(_state): State<AppState<D>>,
     Path(name): Path<String>,
 ) -> impl IntoResponse {
@@ -357,7 +400,16 @@ async fn api_trigger_sync_handler<D: Database + 'static>(
 }
 
 /// Cache stats API handler
-async fn api_cache_stats_handler<D: Database + 'static>(
+#[cfg_attr(feature = "swagger-gen", utoipa::path(
+    get,
+    path = "/api/cache/stats",
+    responses(
+        (status = 200, description = "Cache statistics", body = CacheStatsResponse),
+    ),
+    security(("bearer_token" = []), ("basic_auth" = [])),
+    tag = "cache"
+))]
+pub(crate) async fn api_cache_stats_handler<D: Database + 'static>(
     State(state): State<AppState<D>>,
 ) -> impl IntoResponse {
     let stats = api::get_cache_stats(&state.cache_plugin).await;
@@ -365,7 +417,16 @@ async fn api_cache_stats_handler<D: Database + 'static>(
 }
 
 /// Cache clear API handler
-async fn api_cache_clear_handler<D: Database + 'static>(
+#[cfg_attr(feature = "swagger-gen", utoipa::path(
+    delete,
+    path = "/api/cache",
+    responses(
+        (status = 200, description = "Cache cleared", body = CacheClearResponse),
+    ),
+    security(("bearer_token" = []), ("basic_auth" = [])),
+    tag = "cache"
+))]
+pub(crate) async fn api_cache_clear_handler<D: Database + 'static>(
     State(state): State<AppState<D>>,
 ) -> impl IntoResponse {
     match api::clear_cache(&state.cache_plugin).await {
@@ -388,7 +449,16 @@ async fn api_cache_clear_handler<D: Database + 'static>(
 }
 
 /// List custom rules handler
-async fn api_list_rules_handler<D: Database + 'static>(
+#[cfg_attr(feature = "swagger-gen", utoipa::path(
+    get,
+    path = "/api/rules",
+    responses(
+        (status = 200, description = "Custom rules list"),
+    ),
+    security(("bearer_token" = []), ("basic_auth" = [])),
+    tag = "rules"
+))]
+pub(crate) async fn api_list_rules_handler<D: Database + 'static>(
     State(state): State<AppState<D>>,
 ) -> impl IntoResponse {
     match state.database.list_rules().await {
@@ -409,7 +479,17 @@ async fn api_list_rules_handler<D: Database + 'static>(
 /// - package_pattern: required, max 512 characters
 /// - version_constraint: optional, max 512 characters
 /// - reason: optional, max 1024 characters
-async fn api_create_rule_handler<D: Database + 'static>(
+#[cfg_attr(feature = "swagger-gen", utoipa::path(
+    post,
+    path = "/api/rules",
+    request_body = CustomRule,
+    responses(
+        (status = 201, description = "Rule created"),
+    ),
+    security(("bearer_token" = []), ("basic_auth" = [])),
+    tag = "rules"
+))]
+pub(crate) async fn api_create_rule_handler<D: Database + 'static>(
     State(state): State<AppState<D>>,
     Json(rule): Json<crate::models::CustomRule>,
 ) -> impl IntoResponse {
@@ -467,7 +547,20 @@ async fn api_create_rule_handler<D: Database + 'static>(
 }
 
 /// Get custom rule by ID handler
-async fn api_get_rule_handler<D: Database + 'static>(
+#[cfg_attr(feature = "swagger-gen", utoipa::path(
+    get,
+    path = "/api/rules/{id}",
+    params(
+        ("id" = i64, Path, description = "Rule ID"),
+    ),
+    responses(
+        (status = 200, description = "Custom rule"),
+        (status = 404, description = "Rule not found"),
+    ),
+    security(("bearer_token" = []), ("basic_auth" = [])),
+    tag = "rules"
+))]
+pub(crate) async fn api_get_rule_handler<D: Database + 'static>(
     State(state): State<AppState<D>>,
     Path(id): Path<i64>,
 ) -> impl IntoResponse {
@@ -493,7 +586,20 @@ async fn api_get_rule_handler<D: Database + 'static>(
 /// - package_pattern: required, max 512 characters
 /// - version_constraint: optional, max 512 characters
 /// - reason: optional, max 1024 characters
-async fn api_update_rule_handler<D: Database + 'static>(
+#[cfg_attr(feature = "swagger-gen", utoipa::path(
+    put,
+    path = "/api/rules/{id}",
+    params(
+        ("id" = i64, Path, description = "Rule ID"),
+    ),
+    request_body = CustomRule,
+    responses(
+        (status = 200, description = "Rule updated"),
+    ),
+    security(("bearer_token" = []), ("basic_auth" = [])),
+    tag = "rules"
+))]
+pub(crate) async fn api_update_rule_handler<D: Database + 'static>(
     State(state): State<AppState<D>>,
     Path(id): Path<i64>,
     Json(mut rule): Json<crate::models::CustomRule>,
@@ -556,7 +662,19 @@ async fn api_update_rule_handler<D: Database + 'static>(
 /// Delete custom rule handler
 ///
 /// Returns 204 No Content on success (REST best practice for DELETE).
-async fn api_delete_rule_handler<D: Database + 'static>(
+#[cfg_attr(feature = "swagger-gen", utoipa::path(
+    delete,
+    path = "/api/rules/{id}",
+    params(
+        ("id" = i64, Path, description = "Rule ID"),
+    ),
+    responses(
+        (status = 204, description = "Rule deleted"),
+    ),
+    security(("bearer_token" = []), ("basic_auth" = [])),
+    tag = "rules"
+))]
+pub(crate) async fn api_delete_rule_handler<D: Database + 'static>(
     State(state): State<AppState<D>>,
     Path(id): Path<i64>,
 ) -> impl IntoResponse {
@@ -579,7 +697,16 @@ async fn api_delete_rule_handler<D: Database + 'static>(
 ///
 /// Returns token metadata with masked token prefix for identification.
 /// Full token values are never exposed after creation.
-async fn api_list_tokens_handler<D: Database + 'static>(
+#[cfg_attr(feature = "swagger-gen", utoipa::path(
+    get,
+    path = "/api/tokens",
+    responses(
+        (status = 200, description = "Token list"),
+    ),
+    security(("bearer_token" = []), ("basic_auth" = [])),
+    tag = "tokens"
+))]
+pub(crate) async fn api_list_tokens_handler<D: Database + 'static>(
     State(state): State<AppState<D>>,
 ) -> impl IntoResponse {
     match state.auth_manager.list_tokens().await {
@@ -603,6 +730,7 @@ async fn api_list_tokens_handler<D: Database + 'static>(
 }
 
 /// Create token request
+#[cfg_attr(feature = "swagger-gen", derive(utoipa::ToSchema))]
 #[derive(Debug, Deserialize)]
 pub struct CreateTokenApiRequest {
     pub name: String,
@@ -611,7 +739,17 @@ pub struct CreateTokenApiRequest {
 }
 
 /// Create token handler
-async fn api_create_token_handler<D: Database + 'static>(
+#[cfg_attr(feature = "swagger-gen", utoipa::path(
+    post,
+    path = "/api/tokens",
+    request_body = CreateTokenApiRequest,
+    responses(
+        (status = 201, description = "Token created"),
+    ),
+    security(("bearer_token" = []), ("basic_auth" = [])),
+    tag = "tokens"
+))]
+pub(crate) async fn api_create_token_handler<D: Database + 'static>(
     State(state): State<AppState<D>>,
     Json(req): Json<CreateTokenApiRequest>,
 ) -> impl IntoResponse {
@@ -664,7 +802,19 @@ async fn api_create_token_handler<D: Database + 'static>(
 ///
 /// Returns 204 No Content on success (REST best practice for DELETE).
 /// Token ID is logged for audit purposes (never the token value).
-async fn api_delete_token_handler<D: Database + 'static>(
+#[cfg_attr(feature = "swagger-gen", utoipa::path(
+    delete,
+    path = "/api/tokens/{id}",
+    params(
+        ("id" = String, Path, description = "Token ID"),
+    ),
+    responses(
+        (status = 204, description = "Token revoked"),
+    ),
+    security(("bearer_token" = []), ("basic_auth" = [])),
+    tag = "tokens"
+))]
+pub(crate) async fn api_delete_token_handler<D: Database + 'static>(
     State(state): State<AppState<D>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {

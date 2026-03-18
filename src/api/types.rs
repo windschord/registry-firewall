@@ -34,6 +34,7 @@ pub const TOKEN_MASK_PREFIX_LENGTH: usize = 8;
 // =============================================================================
 
 /// Dashboard statistics response
+#[cfg_attr(feature = "swagger-gen", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct DashboardStats {
     /// Total number of requests processed
@@ -64,6 +65,7 @@ impl Default for DashboardStats {
 }
 
 /// Security source summary for dashboard
+#[cfg_attr(feature = "swagger-gen", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct SecuritySourceSummary {
     /// Source name
@@ -79,6 +81,7 @@ pub struct SecuritySourceSummary {
 }
 
 /// Block logs query parameters
+#[cfg_attr(feature = "swagger-gen", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, Deserialize, Default)]
 pub struct BlockLogsQuery {
     /// Number of logs to return (default: 50)
@@ -88,6 +91,7 @@ pub struct BlockLogsQuery {
 }
 
 /// Block logs response
+#[cfg_attr(feature = "swagger-gen", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct BlockLogsResponse {
     /// Block log entries
@@ -97,6 +101,7 @@ pub struct BlockLogsResponse {
 }
 
 /// Block log entry for API response
+#[cfg_attr(feature = "swagger-gen", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct BlockLogEntry {
     /// Log ID
@@ -133,6 +138,7 @@ impl From<BlockLog> for BlockLogEntry {
 }
 
 /// Security sources response
+#[cfg_attr(feature = "swagger-gen", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct SecuritySourcesResponse {
     /// List of security sources
@@ -140,6 +146,7 @@ pub struct SecuritySourcesResponse {
 }
 
 /// Security source information
+#[cfg_attr(feature = "swagger-gen", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct SecuritySourceInfo {
     /// Source name
@@ -155,6 +162,7 @@ pub struct SecuritySourceInfo {
 }
 
 /// Sync trigger response
+#[cfg_attr(feature = "swagger-gen", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct SyncTriggerResponse {
     /// Response message
@@ -166,6 +174,7 @@ pub struct SyncTriggerResponse {
 }
 
 /// Cache statistics response
+#[cfg_attr(feature = "swagger-gen", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct CacheStatsResponse {
     /// Cache plugin name
@@ -181,6 +190,7 @@ pub struct CacheStatsResponse {
 }
 
 /// Cache clear response
+#[cfg_attr(feature = "swagger-gen", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct CacheClearResponse {
     /// Response message
@@ -188,6 +198,7 @@ pub struct CacheClearResponse {
 }
 
 /// Rules list response
+#[cfg_attr(feature = "swagger-gen", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct RulesResponse {
     /// List of custom rules
@@ -195,6 +206,7 @@ pub struct RulesResponse {
 }
 
 /// Token list response
+#[cfg_attr(feature = "swagger-gen", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct TokensResponse {
     /// List of tokens (without hashes)
@@ -202,6 +214,7 @@ pub struct TokensResponse {
 }
 
 /// Token information (safe to return - never exposes full token value)
+#[cfg_attr(feature = "swagger-gen", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct TokenInfo {
     /// Token ID
@@ -240,6 +253,7 @@ impl From<&Token> for TokenInfo {
 }
 
 /// Create token request
+#[cfg_attr(feature = "swagger-gen", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, Deserialize)]
 pub struct CreateTokenRequest {
     /// Token name
@@ -251,6 +265,7 @@ pub struct CreateTokenRequest {
 }
 
 /// Create token response
+#[cfg_attr(feature = "swagger-gen", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct CreateTokenResponse {
     /// Token ID
@@ -266,6 +281,7 @@ pub struct CreateTokenResponse {
 }
 
 /// Generic message response
+#[cfg_attr(feature = "swagger-gen", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct MessageResponse {
     /// Response message
@@ -273,6 +289,7 @@ pub struct MessageResponse {
 }
 
 /// Error response
+#[cfg_attr(feature = "swagger-gen", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ErrorResponse {
     /// Error message

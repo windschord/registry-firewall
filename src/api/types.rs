@@ -336,6 +336,14 @@ mod tests {
 
         assert_eq!(info.id, "test-id");
         assert_eq!(info.name, "test-token");
+        assert!(
+            info.token_prefix.starts_with("rf_"),
+            "token_prefix should start with rf_ prefix"
+        );
+        assert!(
+            info.token_prefix.ends_with("***"),
+            "token_prefix should be masked with ***"
+        );
     }
 
     // Test 13: DashboardStats serialization

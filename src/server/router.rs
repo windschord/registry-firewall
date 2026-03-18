@@ -131,17 +131,6 @@ pub fn build_router<D: Database + 'static>(state: AppState<D>) -> Router {
         .route("/ui", get(webui_index_handler))
         .route("/ui/*path", get(webui_static_handler));
 
-    // Swagger UI endpoint (requires both webui and swagger-gen features)
-    #[cfg(all(feature = "webui", feature = "swagger-gen"))]
-    let router = {
-        use crate::api::openapi::ApiDoc;
-        use utoipa::OpenApi;
-        router.merge(
-            utoipa_swagger_ui::SwaggerUi::new("/api/swagger-ui")
-                .url("/api/openapi.json", ApiDoc::openapi()),
-        )
-    };
-
     router
         // Apply authentication middleware
         .layer(middleware::from_fn_with_state(

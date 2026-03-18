@@ -296,6 +296,15 @@ pub struct ErrorResponse {
     pub error: String,
 }
 
+/// Create token API request
+#[cfg_attr(feature = "swagger-gen", derive(utoipa::ToSchema))]
+#[derive(Debug, Deserialize)]
+pub struct CreateTokenApiRequest {
+    pub name: String,
+    pub allowed_ecosystems: Option<Vec<String>>,
+    pub expires_at: Option<chrono::DateTime<chrono::Utc>>,
+}
+
 // =============================================================================
 // Tests
 // =============================================================================

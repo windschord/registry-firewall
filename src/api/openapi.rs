@@ -7,7 +7,6 @@ use utoipa::OpenApi;
 
 use crate::api::types::*;
 use crate::models::CustomRule;
-use crate::server::router::CreateTokenApiRequest;
 
 #[derive(OpenApi)]
 #[openapi(

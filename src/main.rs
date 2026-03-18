@@ -46,8 +46,8 @@ async fn main() -> anyhow::Result<()> {
         use utoipa::OpenApi;
         let spec = ApiDoc::openapi()
             .to_pretty_json()
-            .expect("Failed to serialize OpenAPI spec");
-        std::fs::write("swagger.json", &spec).expect("Failed to write swagger.json");
+            .map_err(|e| anyhow::anyhow!("Failed to serialize OpenAPI spec: {}", e))?;
+        std::fs::write("swagger.json", &spec)?;
         eprintln!("swagger.json generated successfully ({} bytes)", spec.len());
         return Ok(());
     }

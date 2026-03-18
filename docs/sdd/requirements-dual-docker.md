@@ -41,7 +41,7 @@
 - **REQ-103** [State-driven] `webui` featureが無効化された状態でビルドされた場合、`/ui`および`/ui/*`エンドポイントはルーターに登録されず、リクエストは404を返さなければならない
 - **REQ-104** [Event-driven] `--no-default-features`フラグを指定してビルドした時、システムはすべてのAPIエンドポイント（`/api/*`）を正常に提供しなければならない
 - **REQ-105** [State-driven] `webui` featureが無効化された状態でビルドされた場合、`webui`モジュール（`src/webui/`）のコードはコンパイルの対象外となり、コンパイル時間を削減しなければならない
-- **REQ-106** [Ubiquitous] DockerfileはARGビルド引数`CARGO_BUILD_FEATURES`を受け取り、`""`（空文字列、デフォルト）または`"webui"`を切り替えて使用できなければならない
+- **REQ-106** [Ubiquitous] APIのみビルド用の`deployments/docker/Dockerfile`は`--no-default-features`でビルドし、GUI付きビルド用の`deployments/docker/Dockerfile.full`は`--features webui`およびNode.jsフロントエンドビルドステージを含めなければならない
 - **REQ-107** [Event-driven] APIのみイメージ（`latest`、`X.Y.Z`）がビルドされた時、タグには`-full`サフィックスが付かないデフォルトタグが使用されなければならない
 
 #### 受入テスト
@@ -157,7 +157,7 @@ gh release view v1.2.3 --json assets | jq '.[].name' | grep swagger.json
 
 ### 後方互換性
 
-- **NFR-106** [Ubiquitous] 既存の`latest`タグのセマンティクスは変更してはならない（現在`latest`は全機能を含むが、本変更後は`latest`はAPIのみに変わる）。この変更はCHANGELOGで明示的に告知されなければならない
+- **NFR-106** [Ubiquitous] `latest`タグのセマンティクスがGUI付きからAPIのみに変わることは、破壊的変更としてCHANGELOGおよびリリースノートで明示的に告知されなければならない
 - **NFR-107** [Ubiquitous] `webui` featureが有効化された状態でビルドした場合、既存の`/ui/*`エンドポイントおよびすべての`/api/*`エンドポイントの動作が変わってはならない
 
 ### セキュリティ

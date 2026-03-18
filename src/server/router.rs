@@ -18,8 +18,8 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 use crate::api::{
-    self, BlockLogsQuery, DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT, MAX_PATTERN_LENGTH,
-    MAX_REASON_LENGTH, MAX_TOKEN_NAME_LENGTH,
+    self, BlockLogsQuery, CreateTokenApiRequest, DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT,
+    MAX_PATTERN_LENGTH, MAX_REASON_LENGTH, MAX_TOKEN_NAME_LENGTH,
 };
 #[cfg(feature = "swagger-gen")]
 use crate::api::{
@@ -130,6 +130,17 @@ pub fn build_router<D: Database + 'static>(state: AppState<D>) -> Router {
     let router = router
         .route("/ui", get(webui_index_handler))
         .route("/ui/*path", get(webui_static_handler));
+
+    // Swagger UI endpoint (requires both webui and swagger-gen features)
+    #[cfg(all(feature = "webui", feature = "swagger-gen"))]
+    let router = {
+        use crate::api::openapi::ApiDoc;
+        use utoipa::OpenApi;
+        router.merge(
+            utoipa_swagger_ui::SwaggerUi::new("/api/swagger-ui")
+                .url("/api/openapi.json", ApiDoc::openapi()),
+        )
+    };
 
     router
         // Apply authentication middleware
@@ -734,15 +745,6 @@ pub(crate) async fn api_list_tokens_handler<D: Database + 'static>(
             )
         }
     }
-}
-
-/// Create token request
-#[cfg_attr(feature = "swagger-gen", derive(utoipa::ToSchema))]
-#[derive(Debug, Deserialize)]
-pub struct CreateTokenApiRequest {
-    pub name: String,
-    pub allowed_ecosystems: Option<Vec<String>>,
-    pub expires_at: Option<chrono::DateTime<chrono::Utc>>,
 }
 
 /// Create token handler

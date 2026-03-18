@@ -252,18 +252,6 @@ impl From<&Token> for TokenInfo {
     }
 }
 
-/// Create token request
-#[cfg_attr(feature = "swagger-gen", derive(utoipa::ToSchema))]
-#[derive(Debug, Clone, Deserialize)]
-pub struct CreateTokenRequest {
-    /// Token name
-    pub name: String,
-    /// Allowed ecosystems
-    pub allowed_ecosystems: Option<Vec<String>>,
-    /// Expiration time
-    pub expires_at: Option<chrono::DateTime<chrono::Utc>>,
-}
-
 /// Create token response
 #[cfg_attr(feature = "swagger-gen", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -407,17 +395,4 @@ mod tests {
         assert_eq!(response, deserialized);
     }
 
-    // Test 16: CreateTokenRequest deserialization
-    #[test]
-    fn test_create_token_request_deserialization() {
-        let json = r#"{"name": "test-token", "allowed_ecosystems": ["pypi", "cargo"]}"#;
-        let request: CreateTokenRequest = serde_json::from_str(json).unwrap();
-
-        assert_eq!(request.name, "test-token");
-        assert_eq!(
-            request.allowed_ecosystems,
-            Some(vec!["pypi".to_string(), "cargo".to_string()])
-        );
-        assert!(request.expires_at.is_none());
-    }
 }

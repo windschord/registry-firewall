@@ -5,7 +5,12 @@
 
 use utoipa::OpenApi;
 
-use crate::api::types::*;
+use crate::api::types::{
+    BlockLogEntry, BlockLogsQuery, BlockLogsResponse, CacheClearResponse, CacheStatsResponse,
+    CreateTokenApiRequest, CreateTokenResponse, DashboardStats, ErrorResponse, MessageResponse,
+    RulesResponse, SecuritySourceInfo, SecuritySourceSummary, SecuritySourcesResponse,
+    SyncTriggerResponse, TokenInfo, TokensResponse,
+};
 use crate::models::CustomRule;
 
 #[derive(OpenApi)]
@@ -35,7 +40,7 @@ use crate::models::CustomRule;
             DashboardStats, SecuritySourceSummary, BlockLogsQuery, BlockLogsResponse,
             BlockLogEntry, SecuritySourcesResponse, SecuritySourceInfo, SyncTriggerResponse,
             CacheStatsResponse, CacheClearResponse, RulesResponse, TokensResponse,
-            TokenInfo, CreateTokenRequest, CreateTokenResponse, MessageResponse, ErrorResponse,
+            TokenInfo, CreateTokenResponse, MessageResponse, ErrorResponse,
             CustomRule, CreateTokenApiRequest,
         )
     ),

@@ -46,7 +46,7 @@
 
 #### 受入テスト
 
-```
+```shell
 # featureなしビルドのテスト
 cargo build --no-default-features
 # → webui関連のコンパイルエラーがないこと
@@ -83,7 +83,7 @@ curl -s http://localhost:8080/api/dashboard
 
 #### 受入テスト
 
-```
+```shell
 # GHCRでのイメージタグ確認（v1.2.3リリース時）
 docker pull ghcr.io/windschord/registry-firewall:latest       # APIのみ
 docker pull ghcr.io/windschord/registry-firewall:1.2.3        # APIのみ
@@ -119,7 +119,7 @@ curl -s http://localhost:8080/ui
 
 #### 受入テスト
 
-```
+```shell
 # swagger.json の生成確認
 cargo run --features swagger-gen -- --generate-swagger
 ls -la swagger.json

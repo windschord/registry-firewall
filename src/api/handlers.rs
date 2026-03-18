@@ -23,9 +23,12 @@ pub async fn build_dashboard_stats<D: Database>(
     database: &D,
     security_plugins: &[Arc<dyn SecuritySourcePlugin>],
     cache_plugin: &Option<Arc<dyn CachePlugin>>,
-) -> DashboardStats {
+) -> Result<DashboardStats, String> {
     // Get block logs count for blocked_requests
-    let blocked_requests = database.get_block_logs_count().await.unwrap_or(0);
+    let blocked_requests = database
+        .get_block_logs_count()
+        .await
+        .map_err(|e| e.to_string())?;
 
     // Get cache stats if available
     let (cache_hit_rate, total_requests) = if let Some(cache) = cache_plugin {
@@ -59,14 +62,14 @@ pub async fn build_dashboard_stats<D: Database>(
     // Calculate total blocked packages
     let blocked_packages_count: u64 = security_sources.iter().map(|s| s.records_count).sum();
 
-    DashboardStats {
+    Ok(DashboardStats {
         total_requests,
         blocked_requests,
         cache_hit_rate,
         security_sources_count: security_plugins.len(),
         blocked_packages_count,
         security_sources,
-    }
+    })
 }
 
 /// Get block logs from database
@@ -183,7 +186,9 @@ mod tests {
         let mut mock_db = MockDatabase::new();
         mock_db.expect_get_block_logs_count().returning(|| Ok(0));
 
-        let stats = build_dashboard_stats(&mock_db, &[], &None::<Arc<dyn CachePlugin>>).await;
+        let stats = build_dashboard_stats(&mock_db, &[], &None::<Arc<dyn CachePlugin>>)
+            .await
+            .unwrap();
 
         assert_eq!(stats.total_requests, 0);
         assert_eq!(stats.blocked_requests, 0);
@@ -210,7 +215,9 @@ mod tests {
         });
 
         let plugins: Vec<Arc<dyn SecuritySourcePlugin>> = vec![Arc::new(mock_plugin)];
-        let stats = build_dashboard_stats(&mock_db, &plugins, &None::<Arc<dyn CachePlugin>>).await;
+        let stats = build_dashboard_stats(&mock_db, &plugins, &None::<Arc<dyn CachePlugin>>)
+            .await
+            .unwrap();
 
         assert_eq!(stats.blocked_requests, 42);
         assert_eq!(stats.security_sources_count, 1);
@@ -235,7 +242,7 @@ mod tests {
         });
 
         let cache: Option<Arc<dyn CachePlugin>> = Some(Arc::new(mock_cache));
-        let stats = build_dashboard_stats(&mock_db, &[], &cache).await;
+        let stats = build_dashboard_stats(&mock_db, &[], &cache).await.unwrap();
 
         assert_eq!(stats.total_requests, 100);
         assert!((stats.cache_hit_rate - 0.8).abs() < 0.001);

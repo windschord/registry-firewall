@@ -312,13 +312,22 @@ async fn registry_proxy_handler<D: Database + 'static>(
 pub(crate) async fn api_dashboard_handler<D: Database + 'static>(
     State(state): State<AppState<D>>,
 ) -> impl IntoResponse {
-    let stats = api::build_dashboard_stats(
+    match api::build_dashboard_stats(
         state.database.as_ref(),
         &state.security_plugins,
         &state.cache_plugin,
     )
-    .await;
-    Json(stats)
+    .await
+    {
+        Ok(stats) => (StatusCode::OK, Json(serde_json::to_value(stats).unwrap())),
+        Err(e) => {
+            tracing::error!(error = %e, "Failed to build dashboard stats");
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": "Failed to fetch dashboard statistics" })),
+            )
+        }
+    }
 }
 
 /// Block logs API handler
@@ -400,10 +409,12 @@ pub(crate) async fn api_trigger_sync_handler<D: Database + 'static>(
     State(_state): State<AppState<D>>,
     Path(name): Path<String>,
 ) -> impl IntoResponse {
-    // TODO: Implement manual sync trigger
-    Json(serde_json::json!({
-        "message": format!("Sync triggered for {}", name)
-    }))
+    (
+        StatusCode::NOT_IMPLEMENTED,
+        Json(serde_json::json!({
+            "error": format!("Manual sync trigger for '{}' is not yet implemented", name)
+        })),
+    )
 }
 
 /// Cache stats API handler
@@ -480,6 +491,39 @@ pub(crate) async fn api_list_rules_handler<D: Database + 'static>(
     }
 }
 
+/// Validate custom rule fields
+fn validate_custom_rule(
+    rule: &crate::models::CustomRule,
+) -> Result<(), (StatusCode, Json<serde_json::Value>)> {
+    if rule.package_pattern.is_empty() {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({ "error": "Package pattern cannot be empty" })),
+        ));
+    }
+    if rule.package_pattern.len() > MAX_PATTERN_LENGTH {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({ "error": "Package pattern exceeds maximum length" })),
+        ));
+    }
+    if rule.version_constraint.len() > MAX_PATTERN_LENGTH {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({ "error": "Version constraint exceeds maximum length" })),
+        ));
+    }
+    if let Some(ref reason) = rule.reason {
+        if reason.len() > MAX_REASON_LENGTH {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::json!({ "error": "Reason exceeds maximum length" })),
+            ));
+        }
+    }
+    Ok(())
+}
+
 /// Create custom rule handler
 ///
 /// Validates rule fields before insertion:
@@ -500,36 +544,8 @@ pub(crate) async fn api_create_rule_handler<D: Database + 'static>(
     State(state): State<AppState<D>>,
     Json(rule): Json<crate::models::CustomRule>,
 ) -> impl IntoResponse {
-    // Validate package_pattern
-    if rule.package_pattern.is_empty() {
-        return (
-            StatusCode::BAD_REQUEST,
-            Json(serde_json::json!({ "error": "Package pattern cannot be empty" })),
-        );
-    }
-    if rule.package_pattern.len() > MAX_PATTERN_LENGTH {
-        return (
-            StatusCode::BAD_REQUEST,
-            Json(serde_json::json!({ "error": "Package pattern exceeds maximum length" })),
-        );
-    }
-
-    // Validate version_constraint
-    if rule.version_constraint.len() > MAX_PATTERN_LENGTH {
-        return (
-            StatusCode::BAD_REQUEST,
-            Json(serde_json::json!({ "error": "Version constraint exceeds maximum length" })),
-        );
-    }
-
-    // Validate reason if provided
-    if let Some(ref reason) = rule.reason {
-        if reason.len() > MAX_REASON_LENGTH {
-            return (
-                StatusCode::BAD_REQUEST,
-                Json(serde_json::json!({ "error": "Reason exceeds maximum length" })),
-            );
-        }
+    if let Err(response) = validate_custom_rule(&rule) {
+        return response;
     }
 
     tracing::info!(
@@ -611,36 +627,8 @@ pub(crate) async fn api_update_rule_handler<D: Database + 'static>(
     Path(id): Path<i64>,
     Json(mut rule): Json<crate::models::CustomRule>,
 ) -> impl IntoResponse {
-    // Validate package_pattern
-    if rule.package_pattern.is_empty() {
-        return (
-            StatusCode::BAD_REQUEST,
-            Json(serde_json::json!({ "error": "Package pattern cannot be empty" })),
-        );
-    }
-    if rule.package_pattern.len() > MAX_PATTERN_LENGTH {
-        return (
-            StatusCode::BAD_REQUEST,
-            Json(serde_json::json!({ "error": "Package pattern exceeds maximum length" })),
-        );
-    }
-
-    // Validate version_constraint
-    if rule.version_constraint.len() > MAX_PATTERN_LENGTH {
-        return (
-            StatusCode::BAD_REQUEST,
-            Json(serde_json::json!({ "error": "Version constraint exceeds maximum length" })),
-        );
-    }
-
-    // Validate reason if provided
-    if let Some(ref reason) = rule.reason {
-        if reason.len() > MAX_REASON_LENGTH {
-            return (
-                StatusCode::BAD_REQUEST,
-                Json(serde_json::json!({ "error": "Reason exceeds maximum length" })),
-            );
-        }
+    if let Err(response) = validate_custom_rule(&rule) {
+        return response;
     }
 
     tracing::info!(

@@ -208,6 +208,16 @@ jobs:
             fi
             git log --pretty=format:"- %s (%h)" -n 50 >> release-notes.md
           fi
+          # Add Docker image information
+          echo "" >> release-notes.md
+          echo "## Docker Images" >> release-notes.md
+          echo "" >> release-notes.md
+          echo "| Variant | Image |" >> release-notes.md
+          echo "|---------|-------|" >> release-notes.md
+          echo "| API only (default) | \`ghcr.io/${{ github.repository }}:${TAG#v}\` |" >> release-notes.md
+          echo "| Full (with Web UI) | \`ghcr.io/${{ github.repository }}:${TAG#v}-full\` |" >> release-notes.md
+          echo "" >> release-notes.md
+          echo "> **Breaking Change**: The \`latest\` tag now points to the API-only image. For the image with Web UI, use the \`latest-full\` tag." >> release-notes.md
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2

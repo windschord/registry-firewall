@@ -18,8 +18,8 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 use crate::api::{
-    self, BlockLogsQuery, CreateTokenApiRequest, DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT,
-    MAX_PATTERN_LENGTH, MAX_REASON_LENGTH, MAX_TOKEN_NAME_LENGTH,
+    self, BlockLogsQuery, CreateTokenApiRequest, MAX_PATTERN_LENGTH, MAX_REASON_LENGTH,
+    MAX_TOKEN_NAME_LENGTH,
 };
 #[cfg(feature = "swagger-gen")]
 use crate::api::{
@@ -352,12 +352,8 @@ pub(crate) async fn api_blocks_handler<D: Database + 'static>(
     State(state): State<AppState<D>>,
     Query(query): Query<BlockLogsQuery>,
 ) -> impl IntoResponse {
-    // Validate and apply limits using constants
-    let limit = query
-        .limit
-        .unwrap_or(DEFAULT_PAGE_LIMIT)
-        .min(MAX_PAGE_LIMIT);
-    let offset = query.offset.unwrap_or(0);
+    let limit = query.normalized_limit();
+    let offset = query.normalized_offset();
 
     match api::get_block_logs(state.database.as_ref(), limit, offset).await {
         Ok(response) => (StatusCode::OK, Json(response)),

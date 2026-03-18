@@ -77,6 +77,20 @@ pub struct BlockLogsQuery {
     pub offset: Option<u32>,
 }
 
+impl BlockLogsQuery {
+    /// Normalized limit, clamped to [1, MAX_PAGE_LIMIT]
+    pub fn normalized_limit(&self) -> u32 {
+        self.limit
+            .unwrap_or(DEFAULT_PAGE_LIMIT)
+            .min(MAX_PAGE_LIMIT)
+    }
+
+    /// Normalized offset, defaults to 0
+    pub fn normalized_offset(&self) -> u32 {
+        self.offset.unwrap_or(0)
+    }
+}
+
 /// Block logs response
 #[cfg_attr(feature = "swagger-gen", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -459,6 +473,15 @@ mod tests {
         let masked = mask_ip("::1");
         // ::1 expands to 0:0:0:0:0:0:0:1, first half preserved, last half masked
         assert!(masked.starts_with("0:0:0:0:"));
+        assert!(masked.ends_with(":x:x:x:x"));
+    }
+
+    // Test: mask_ip with IPv4-mapped IPv6 form
+    #[test]
+    fn test_mask_ip_ipv4_mapped_ipv6() {
+        let masked = mask_ip("::ffff:192.0.2.128");
+        // IPv4-mapped IPv6 should not leak raw IPv4 dotted notation
+        assert!(!masked.contains("192.0.2.128"));
         assert!(masked.ends_with(":x:x:x:x"));
     }
 

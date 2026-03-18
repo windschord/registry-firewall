@@ -17,12 +17,6 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
-use crate::auth::AuthManager;
-use crate::database::Database;
-use crate::plugins::cache::traits::CachePlugin;
-use crate::plugins::registry::RegistryPlugin;
-use crate::plugins::security::traits::SecuritySourcePlugin;
-use crate::server::middleware::auth_middleware;
 use crate::api::{
     self, BlockLogsQuery, DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT, MAX_PATTERN_LENGTH,
     MAX_REASON_LENGTH, MAX_TOKEN_NAME_LENGTH,
@@ -32,8 +26,14 @@ use crate::api::{
     BlockLogsResponse, CacheClearResponse, CacheStatsResponse, DashboardStats,
     SecuritySourcesResponse,
 };
+use crate::auth::AuthManager;
+use crate::database::Database;
 #[cfg(feature = "swagger-gen")]
 use crate::models::CustomRule;
+use crate::plugins::cache::traits::CachePlugin;
+use crate::plugins::registry::RegistryPlugin;
+use crate::plugins::security::traits::SecuritySourcePlugin;
+use crate::server::middleware::auth_middleware;
 
 /// Shared application state
 pub struct AppState<D: Database> {

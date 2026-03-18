@@ -47,8 +47,7 @@ async fn main() -> anyhow::Result<()> {
         let spec = ApiDoc::openapi()
             .to_pretty_json()
             .expect("Failed to serialize OpenAPI spec");
-        std::fs::write("swagger.json", &spec)
-            .expect("Failed to write swagger.json");
+        std::fs::write("swagger.json", &spec).expect("Failed to write swagger.json");
         eprintln!("swagger.json generated successfully ({} bytes)", spec.len());
         return Ok(());
     }

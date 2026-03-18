@@ -61,26 +61,24 @@ impl utoipa::Modify for SecurityAddon {
         openapi.info.version = env!("CARGO_PKG_VERSION").to_string();
 
         // Add server definition with placeholder
-        openapi.servers = Some(vec![
-            utoipa::openapi::ServerBuilder::new()
-                .url("{scheme}://{host}:{port}")
-                .description(Some("registry-firewall instance"))
-                .parameter(
-                    "scheme",
-                    utoipa::openapi::ServerVariableBuilder::new()
-                        .default_value("http")
-                        .enum_values(Some(["http", "https"])),
-                )
-                .parameter(
-                    "host",
-                    utoipa::openapi::ServerVariableBuilder::new().default_value("localhost"),
-                )
-                .parameter(
-                    "port",
-                    utoipa::openapi::ServerVariableBuilder::new().default_value("8080"),
-                )
-                .build(),
-        ]);
+        openapi.servers = Some(vec![utoipa::openapi::ServerBuilder::new()
+            .url("{scheme}://{host}:{port}")
+            .description(Some("registry-firewall instance"))
+            .parameter(
+                "scheme",
+                utoipa::openapi::ServerVariableBuilder::new()
+                    .default_value("http")
+                    .enum_values(Some(["http", "https"])),
+            )
+            .parameter(
+                "host",
+                utoipa::openapi::ServerVariableBuilder::new().default_value("localhost"),
+            )
+            .parameter(
+                "port",
+                utoipa::openapi::ServerVariableBuilder::new().default_value("8080"),
+            )
+            .build()]);
 
         // Add security schemes
         let components = openapi.components.get_or_insert_with(Default::default);

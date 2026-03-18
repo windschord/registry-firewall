@@ -80,7 +80,10 @@ pub struct BlockLogsQuery {
 impl BlockLogsQuery {
     /// Normalized limit, clamped to [1, MAX_PAGE_LIMIT]
     pub fn normalized_limit(&self) -> u32 {
-        self.limit.unwrap_or(DEFAULT_PAGE_LIMIT).min(MAX_PAGE_LIMIT)
+        self.limit
+            .unwrap_or(DEFAULT_PAGE_LIMIT)
+            .max(1)
+            .min(MAX_PAGE_LIMIT)
     }
 
     /// Normalized offset, defaults to 0
@@ -500,5 +503,30 @@ mod tests {
         assert!(debug_output.contains("<redacted>"));
         assert!(debug_output.contains("test-id"));
         assert!(debug_output.contains("test-name"));
+    }
+
+    // Test: BlockLogsQuery normalized_limit boundary conditions
+    #[test]
+    fn test_normalized_limit_bounds() {
+        // Zero clamped to 1
+        let q = BlockLogsQuery {
+            limit: Some(0),
+            offset: None,
+        };
+        assert_eq!(q.normalized_limit(), 1);
+
+        // Over MAX clamped down
+        let q = BlockLogsQuery {
+            limit: Some(MAX_PAGE_LIMIT + 1),
+            offset: None,
+        };
+        assert_eq!(q.normalized_limit(), MAX_PAGE_LIMIT);
+
+        // Default when None
+        let q = BlockLogsQuery {
+            limit: None,
+            offset: None,
+        };
+        assert_eq!(q.normalized_limit(), DEFAULT_PAGE_LIMIT);
     }
 }

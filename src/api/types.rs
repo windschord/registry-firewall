@@ -120,21 +120,21 @@ impl BlockLogEntry {
 
 /// Mask an IP address for privacy (e.g., "192.168.1.100" -> "192.168.x.x")
 fn mask_ip(ip: &str) -> String {
-    if let Some(dot_pos) = ip.find('.') {
-        if let Some(second_dot) = ip[dot_pos + 1..].find('.') {
-            let prefix = &ip[..dot_pos + 1 + second_dot];
-            return format!("{}.x.x", prefix);
-        }
+    // Strict IPv4 validation: exactly 4 octets, each 0-255
+    let parts: Vec<&str> = ip.split('.').collect();
+    if parts.len() == 4 && parts.iter().all(|p| p.parse::<u8>().is_ok()) {
+        return format!("{}.{}.x.x", parts[0], parts[1]);
     }
-    // IPv6 or unparseable: mask last half of segments
+    // IPv6: mask last half of segments
     if ip.contains(':') {
-        let parts: Vec<&str> = ip.split(':').collect();
-        let half = parts.len() / 2;
-        let prefix: Vec<&str> = parts[..half].to_vec();
-        let masked_count = parts.len() - half;
+        let segments: Vec<&str> = ip.split(':').collect();
+        let half = segments.len() / 2;
+        let prefix: Vec<&str> = segments[..half].to_vec();
+        let masked_count = segments.len() - half;
         let mask = vec!["x"; masked_count].join(":");
         return format!("{}:{}", prefix.join(":"), mask);
     }
+    // Unparseable: fully mask
     "x.x.x.x".to_string()
 }
 
@@ -270,7 +270,7 @@ impl From<&Token> for TokenInfo {
 
 /// Create token response
 #[cfg_attr(feature = "swagger-gen", derive(utoipa::ToSchema))]
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Serialize, Deserialize, PartialEq)]
 pub struct CreateTokenResponse {
     /// Token ID
     pub id: String,
@@ -282,6 +282,18 @@ pub struct CreateTokenResponse {
     pub created_at: chrono::DateTime<chrono::Utc>,
     /// Expires at
     pub expires_at: Option<chrono::DateTime<chrono::Utc>>,
+}
+
+impl std::fmt::Debug for CreateTokenResponse {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CreateTokenResponse")
+            .field("id", &self.id)
+            .field("name", &self.name)
+            .field("token", &"<redacted>")
+            .field("created_at", &self.created_at)
+            .field("expires_at", &self.expires_at)
+            .finish()
+    }
 }
 
 /// Generic message response

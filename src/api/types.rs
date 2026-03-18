@@ -103,10 +103,19 @@ pub struct BlockLogEntry {
     pub source: String,
     /// Block reason
     pub reason: Option<String>,
-    /// Client IP (masked for privacy, e.g. "192.168.x.x")
-    pub client_ip: Option<String>,
+    /// Client IP (always masked for privacy, e.g. "192.168.x.x").
+    /// Use `BlockLogEntry::from(BlockLog)` to construct; raw IPs are auto-masked.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    client_ip: Option<String>,
     /// Timestamp
     pub timestamp: chrono::DateTime<chrono::Utc>,
+}
+
+impl BlockLogEntry {
+    /// Get the masked client IP
+    pub fn client_ip(&self) -> Option<&str> {
+        self.client_ip.as_deref()
+    }
 }
 
 /// Mask an IP address for privacy (e.g., "192.168.1.100" -> "192.168.x.x")
@@ -374,17 +383,14 @@ mod tests {
     // Test 14: BlockLogsResponse serialization
     #[test]
     fn test_block_logs_response_serialization() {
+        let mut log = BlockLog::new("pypi", "malicious", "1.0.0", "osv");
+        log.reason = Some("CVE-2024-1234".to_string());
+        log.client_ip = Some("192.168.1.1".to_string());
+        let entry = BlockLogEntry::from(log);
+        // Verify IP is masked
+        assert_eq!(entry.client_ip(), Some("192.168.x.x"));
         let response = BlockLogsResponse {
-            logs: vec![BlockLogEntry {
-                id: Some(1),
-                ecosystem: "pypi".to_string(),
-                package: "malicious".to_string(),
-                version: "1.0.0".to_string(),
-                source: "osv".to_string(),
-                reason: Some("CVE-2024-1234".to_string()),
-                client_ip: Some("192.168.1.1".to_string()),
-                timestamp: Utc::now(),
-            }],
+            logs: vec![entry],
             total: 1,
         };
 

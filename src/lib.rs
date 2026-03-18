@@ -3,6 +3,7 @@
 //! This crate provides a proxy server that filters malicious packages and versions
 //! from package registries like PyPI, Go modules, Cargo, and Docker.
 
+pub mod api;
 pub mod auth;
 pub mod config;
 pub mod database;
@@ -12,4 +13,5 @@ pub mod otel;
 pub mod plugins;
 pub mod server;
 pub mod sync;
+#[cfg(feature = "webui")]
 pub mod webui;

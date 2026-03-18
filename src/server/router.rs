@@ -23,7 +23,7 @@ use crate::plugins::cache::traits::CachePlugin;
 use crate::plugins::registry::RegistryPlugin;
 use crate::plugins::security::traits::SecuritySourcePlugin;
 use crate::server::middleware::auth_middleware;
-use crate::webui::api::{
+use crate::api::{
     self, BlockLogsQuery, DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT, MAX_PATTERN_LENGTH,
     MAX_REASON_LENGTH, MAX_TOKEN_NAME_LENGTH,
 };
@@ -86,7 +86,7 @@ pub struct MetricsResponse {
 pub fn build_router<D: Database + 'static>(state: AppState<D>) -> Router {
     let auth_manager = Arc::clone(&state.auth_manager);
 
-    Router::new()
+    let router = Router::new()
         // Health and metrics endpoints (no auth required)
         .route("/health", get(health_handler))
         .route("/metrics", get(metrics_handler))
@@ -116,10 +116,15 @@ pub fn build_router<D: Database + 'static>(state: AppState<D>) -> Router {
         .route("/api/rules/:id", delete(api_delete_rule_handler::<D>))
         .route("/api/tokens", get(api_list_tokens_handler::<D>))
         .route("/api/tokens", post(api_create_token_handler::<D>))
-        .route("/api/tokens/:id", delete(api_delete_token_handler::<D>))
-        // Web UI routes
+        .route("/api/tokens/:id", delete(api_delete_token_handler::<D>));
+
+    // Web UI routes (only when webui feature is enabled)
+    #[cfg(feature = "webui")]
+    let router = router
         .route("/ui", get(webui_index_handler))
-        .route("/ui/*path", get(webui_static_handler))
+        .route("/ui/*path", get(webui_static_handler));
+
+    router
         // Apply authentication middleware
         .layer(middleware::from_fn_with_state(
             auth_manager,
@@ -684,11 +689,13 @@ async fn api_delete_token_handler<D: Database + 'static>(
 // =============================================================================
 
 /// Web UI index handler
+#[cfg(feature = "webui")]
 async fn webui_index_handler() -> impl IntoResponse {
     crate::webui::serve_index()
 }
 
 /// Web UI static file handler
+#[cfg(feature = "webui")]
 async fn webui_static_handler(Path(path): Path<String>) -> impl IntoResponse {
     crate::webui::serve_static(&path)
 }
@@ -889,6 +896,7 @@ mod tests {
     }
 
     // Test 13: Web UI index endpoint
+    #[cfg(feature = "webui")]
     #[tokio::test]
     async fn test_webui_index_endpoint() {
         let state = create_test_state();
@@ -900,6 +908,7 @@ mod tests {
     }
 
     // Test 14: Web UI static files endpoint
+    #[cfg(feature = "webui")]
     #[tokio::test]
     async fn test_webui_static_endpoint() {
         let state = create_test_state();

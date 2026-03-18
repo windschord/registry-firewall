@@ -1,12 +1,7 @@
 //! Web UI backend module
 //!
 //! This module provides the backend functionality for the Web UI including:
-//! - REST API endpoints for dashboard, blocks, rules, tokens, etc.
 //! - Static file embedding and serving (via rust-embed)
-
-pub mod api;
-
-pub use api::*;
 
 use axum::{
     body::Body,

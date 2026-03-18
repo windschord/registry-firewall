@@ -394,5 +394,4 @@ mod tests {
 
         assert_eq!(response, deserialized);
     }
-
 }

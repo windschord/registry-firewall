@@ -155,11 +155,13 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          flavor: |
+            suffix=-full
           tags: |
-            type=semver,pattern={{version}}-full
-            type=semver,pattern={{major}}.{{minor}}-full,enable=${{ needs.test.outputs.is_prerelease == 'false' }}
-            type=semver,pattern={{major}}-full,enable=${{ needs.test.outputs.is_prerelease == 'false' }}
-            type=raw,value=latest-full,enable=${{ needs.test.outputs.is_prerelease == 'false' }}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}},enable=${{ needs.test.outputs.is_prerelease == 'false' }}
+            type=semver,pattern={{major}},enable=${{ needs.test.outputs.is_prerelease == 'false' }}
+            type=raw,value=latest,enable=${{ needs.test.outputs.is_prerelease == 'false' }}
 
       - name: Build and push full Docker image
         uses: docker/build-push-action@v7

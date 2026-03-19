@@ -80,10 +80,7 @@ pub struct BlockLogsQuery {
 impl BlockLogsQuery {
     /// Normalized limit, clamped to [1, MAX_PAGE_LIMIT]
     pub fn normalized_limit(&self) -> u32 {
-        self.limit
-            .unwrap_or(DEFAULT_PAGE_LIMIT)
-            .max(1)
-            .min(MAX_PAGE_LIMIT)
+        self.limit.unwrap_or(DEFAULT_PAGE_LIMIT).clamp(1, MAX_PAGE_LIMIT)
     }
 
     /// Normalized offset, defaults to 0

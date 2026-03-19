@@ -1,10 +1,29 @@
-# registry-firewall API-only Dockerfile
+# registry-firewall Full Dockerfile (with Web UI)
 #
-# This Dockerfile builds the API-only image without Web UI.
-# For the full image with Web UI, use Dockerfile.full.
+# This Dockerfile builds the full image including Web UI.
+# For the API-only image, use Dockerfile.
 
 # ==============================================================================
-# Stage 1: Build the Rust application (API only, no webui feature)
+# Stage 1: Build the frontend
+# ==============================================================================
+FROM node:20-bookworm-slim AS node-build
+
+WORKDIR /app/web
+
+# Copy package files first for layer caching
+COPY web/package.json web/package-lock.json ./
+
+# Install dependencies
+RUN npm ci
+
+# Copy frontend source
+COPY web/ ./
+
+# Build the frontend
+RUN npm run build
+
+# ==============================================================================
+# Stage 2: Build the Rust application (with webui feature)
 # ==============================================================================
 FROM rust:1-bookworm AS builder
 
@@ -21,23 +40,26 @@ RUN apt-get update && apt-get install -y \
 COPY Cargo.toml Cargo.lock ./
 
 # Create a dummy source file to build dependencies
-RUN mkdir -p src && \
+RUN mkdir -p src web/dist && \
     echo 'fn main() { println!("Dummy"); }' > src/main.rs && \
     echo 'pub fn lib() {}' > src/lib.rs
 
 # Build dependencies (this layer will be cached unless Cargo.toml/lock changes)
-RUN cargo build --release --no-default-features && \
+RUN cargo build --release --features webui && \
     cargo clean -p registry-firewall --release && \
     rm -rf src
 
-# Copy the actual source code (no web/ needed for API-only build)
+# Copy the actual source code
 COPY src src/
 
-# Build the application without webui feature
-RUN cargo build --release --no-default-features
+# Copy built frontend from node-build stage
+COPY --from=node-build /app/web/dist web/dist/
+
+# Build the application with webui feature
+RUN cargo build --release --features webui
 
 # ==============================================================================
-# Stage 2: Create the minimal runtime image
+# Stage 3: Create the minimal runtime image
 # ==============================================================================
 FROM debian:bookworm-slim AS runtime
 

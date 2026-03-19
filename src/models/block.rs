@@ -273,6 +273,7 @@ impl BlockLog {
 }
 
 /// Custom block rule
+#[cfg_attr(feature = "swagger-gen", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CustomRule {
     /// Database ID (optional, set after insertion)

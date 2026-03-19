@@ -1,0 +1,531 @@
+//! API type definitions
+//!
+//! This module contains request/response types and constants for the REST API.
+
+use serde::{Deserialize, Serialize};
+
+use crate::models::{BlockLog, Token};
+
+// =============================================================================
+// Constants
+// =============================================================================
+
+/// Default number of items per page for pagination
+pub const DEFAULT_PAGE_LIMIT: u32 = 50;
+
+/// Maximum number of items per page for pagination.
+/// This limit prevents excessive database queries and memory usage.
+pub const MAX_PAGE_LIMIT: u32 = 1000;
+
+/// Maximum length for token names
+pub const MAX_TOKEN_NAME_LENGTH: usize = 256;
+
+/// Maximum length for rule patterns
+pub const MAX_PATTERN_LENGTH: usize = 512;
+
+/// Maximum length for reason text
+pub const MAX_REASON_LENGTH: usize = 1024;
+
+/// Number of characters to show in masked token prefix
+pub const TOKEN_MASK_PREFIX_LENGTH: usize = 8;
+
+// =============================================================================
+// Request/Response Types
+// =============================================================================
+
+/// Dashboard statistics response
+#[cfg_attr(feature = "swagger-gen", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct DashboardStats {
+    /// Total number of requests processed
+    pub total_requests: u64,
+    /// Total number of blocked requests
+    pub blocked_requests: u64,
+    /// Cache hit rate (0.0 to 1.0)
+    pub cache_hit_rate: f64,
+    /// Number of security sources configured
+    pub security_sources_count: usize,
+    /// Number of blocked packages
+    pub blocked_packages_count: u64,
+    /// List of security source summaries
+    pub security_sources: Vec<SecuritySourceSummary>,
+}
+
+impl Default for DashboardStats {
+    fn default() -> Self {
+        Self {
+            total_requests: 0,
+            blocked_requests: 0,
+            cache_hit_rate: 0.0,
+            security_sources_count: 0,
+            blocked_packages_count: 0,
+            security_sources: vec![],
+        }
+    }
+}
+
+/// Security source summary for dashboard (alias for SecuritySourceInfo)
+pub type SecuritySourceSummary = SecuritySourceInfo;
+
+/// Block logs query parameters
+#[cfg_attr(feature = "swagger-gen", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, Deserialize, Default)]
+pub struct BlockLogsQuery {
+    /// Number of logs to return (default: 50)
+    pub limit: Option<u32>,
+    /// Offset for pagination (default: 0)
+    pub offset: Option<u32>,
+}
+
+impl BlockLogsQuery {
+    /// Normalized limit, clamped to [1, MAX_PAGE_LIMIT]
+    pub fn normalized_limit(&self) -> u32 {
+        self.limit
+            .unwrap_or(DEFAULT_PAGE_LIMIT)
+            .clamp(1, MAX_PAGE_LIMIT)
+    }
+
+    /// Normalized offset, defaults to 0
+    pub fn normalized_offset(&self) -> u32 {
+        self.offset.unwrap_or(0)
+    }
+}
+
+/// Block logs response
+#[cfg_attr(feature = "swagger-gen", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct BlockLogsResponse {
+    /// Block log entries
+    pub logs: Vec<BlockLogEntry>,
+    /// Total count of block logs
+    pub total: u64,
+}
+
+/// Block log entry for API response
+#[cfg_attr(feature = "swagger-gen", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct BlockLogEntry {
+    /// Log ID
+    pub id: Option<i64>,
+    /// Package ecosystem
+    pub ecosystem: String,
+    /// Package name
+    pub package: String,
+    /// Package version
+    pub version: String,
+    /// Block source
+    pub source: String,
+    /// Block reason
+    pub reason: Option<String>,
+    /// Client IP (always masked for privacy, e.g. "192.168.x.x").
+    /// Use `BlockLogEntry::from(BlockLog)` to construct; raw IPs are auto-masked.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    client_ip: Option<String>,
+    /// Timestamp
+    pub timestamp: chrono::DateTime<chrono::Utc>,
+}
+
+impl BlockLogEntry {
+    /// Get the masked client IP
+    pub fn client_ip(&self) -> Option<&str> {
+        self.client_ip.as_deref()
+    }
+}
+
+/// Mask an IP address for privacy (e.g., "192.168.1.100" -> "192.168.x.x")
+fn mask_ip(ip: &str) -> String {
+    use std::net::IpAddr;
+    match ip.parse::<IpAddr>() {
+        Ok(IpAddr::V4(addr)) => {
+            let octets = addr.octets();
+            format!("{}.{}.x.x", octets[0], octets[1])
+        }
+        Ok(IpAddr::V6(addr)) => {
+            let segments = addr.segments();
+            let half = segments.len() / 2;
+            let prefix: Vec<String> = segments[..half]
+                .iter()
+                .map(|s| format!("{:x}", s))
+                .collect();
+            let masked_count = segments.len() - half;
+            let mask = vec!["x"; masked_count].join(":");
+            format!("{}:{}", prefix.join(":"), mask)
+        }
+        Err(_) => "x.x.x.x".to_string(),
+    }
+}
+
+impl From<BlockLog> for BlockLogEntry {
+    fn from(log: BlockLog) -> Self {
+        Self {
+            id: log.id,
+            ecosystem: log.ecosystem,
+            package: log.package,
+            version: log.version,
+            source: log.source,
+            reason: log.reason,
+            client_ip: log.client_ip.as_deref().map(mask_ip),
+            timestamp: log.timestamp,
+        }
+    }
+}
+
+/// Security sources response
+#[cfg_attr(feature = "swagger-gen", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct SecuritySourcesResponse {
+    /// List of security sources
+    pub sources: Vec<SecuritySourceInfo>,
+}
+
+/// Security source information
+#[cfg_attr(feature = "swagger-gen", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct SecuritySourceInfo {
+    /// Source name
+    pub name: String,
+    /// Supported ecosystems
+    pub ecosystems: Vec<String>,
+    /// Last sync time
+    pub last_sync: Option<chrono::DateTime<chrono::Utc>>,
+    /// Current status
+    pub status: String,
+    /// Number of records
+    pub records_count: u64,
+}
+
+/// Sync trigger response
+#[cfg_attr(feature = "swagger-gen", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct SyncTriggerResponse {
+    /// Response message
+    pub message: String,
+    /// Whether the sync was successful
+    pub success: bool,
+    /// Number of records updated (if sync completed)
+    pub records_updated: Option<u64>,
+}
+
+/// Cache statistics response
+#[cfg_attr(feature = "swagger-gen", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct CacheStatsResponse {
+    /// Cache plugin name
+    pub plugin: String,
+    /// Number of cache hits
+    pub hits: u64,
+    /// Number of cache misses
+    pub misses: u64,
+    /// Total cache size in bytes
+    pub total_size_bytes: u64,
+    /// Number of cache entries
+    pub entries: u64,
+}
+
+/// Cache clear response
+#[cfg_attr(feature = "swagger-gen", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct CacheClearResponse {
+    /// Response message
+    pub message: String,
+}
+
+/// Rules list response
+#[cfg_attr(feature = "swagger-gen", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct RulesResponse {
+    /// List of custom rules
+    pub rules: Vec<crate::models::CustomRule>,
+}
+
+/// Token list response
+#[cfg_attr(feature = "swagger-gen", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct TokensResponse {
+    /// List of tokens (without hashes)
+    pub tokens: Vec<TokenInfo>,
+}
+
+/// Token information (safe to return - never exposes full token value)
+#[cfg_attr(feature = "swagger-gen", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct TokenInfo {
+    /// Token ID
+    pub id: String,
+    /// Token name
+    pub name: String,
+    /// Masked token prefix for identification (e.g., "rf_abc1***")
+    pub token_prefix: String,
+    /// Created at
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    /// Expires at
+    pub expires_at: Option<chrono::DateTime<chrono::Utc>>,
+    /// Last used at
+    pub last_used_at: Option<chrono::DateTime<chrono::Utc>>,
+    /// Allowed ecosystems
+    pub allowed_ecosystems: Vec<String>,
+}
+
+impl From<&Token> for TokenInfo {
+    fn from(token: &Token) -> Self {
+        // Create masked token prefix: "rf_" + first N chars of ID + "***"
+        let prefix = format!(
+            "rf_{}***",
+            &token.id[..TOKEN_MASK_PREFIX_LENGTH.min(token.id.len())]
+        );
+        Self {
+            id: token.id.clone(),
+            name: token.name.clone(),
+            token_prefix: prefix,
+            created_at: token.created_at,
+            expires_at: token.expires_at,
+            last_used_at: token.last_used_at,
+            allowed_ecosystems: token.allowed_ecosystems.clone(),
+        }
+    }
+}
+
+/// Create token response
+#[cfg_attr(feature = "swagger-gen", derive(utoipa::ToSchema))]
+#[derive(Clone, Serialize, Deserialize, PartialEq)]
+pub struct CreateTokenResponse {
+    /// Token ID
+    pub id: String,
+    /// Token name
+    pub name: String,
+    /// The actual token (only returned once)
+    pub token: String,
+    /// Created at
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    /// Expires at
+    pub expires_at: Option<chrono::DateTime<chrono::Utc>>,
+}
+
+impl std::fmt::Debug for CreateTokenResponse {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CreateTokenResponse")
+            .field("id", &self.id)
+            .field("name", &self.name)
+            .field("token", &"<redacted>")
+            .field("created_at", &self.created_at)
+            .field("expires_at", &self.expires_at)
+            .finish()
+    }
+}
+
+/// Generic message response
+#[cfg_attr(feature = "swagger-gen", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct MessageResponse {
+    /// Response message
+    pub message: String,
+}
+
+/// Error response
+#[cfg_attr(feature = "swagger-gen", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ErrorResponse {
+    /// Error message
+    pub error: String,
+}
+
+/// Create token API request
+#[cfg_attr(feature = "swagger-gen", derive(utoipa::ToSchema))]
+#[derive(Debug, Deserialize)]
+pub struct CreateTokenApiRequest {
+    pub name: String,
+    pub allowed_ecosystems: Option<Vec<String>>,
+    pub expires_at: Option<chrono::DateTime<chrono::Utc>>,
+}
+
+// =============================================================================
+// Tests
+// =============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::BlockLog;
+    use crate::models::Token;
+    use chrono::Utc;
+
+    // Test 1: DashboardStats default values
+    #[test]
+    fn test_dashboard_stats_default() {
+        let stats = DashboardStats::default();
+        assert_eq!(stats.total_requests, 0);
+        assert_eq!(stats.blocked_requests, 0);
+        assert_eq!(stats.cache_hit_rate, 0.0);
+        assert_eq!(stats.security_sources_count, 0);
+        assert_eq!(stats.blocked_packages_count, 0);
+        assert!(stats.security_sources.is_empty());
+    }
+
+    // Test 2: BlockLogEntry from BlockLog conversion
+    #[test]
+    fn test_block_log_entry_from_block_log() {
+        let log = BlockLog::new("pypi", "malicious-pkg", "1.0.0", "osv");
+        let entry = BlockLogEntry::from(log.clone());
+
+        assert_eq!(entry.ecosystem, "pypi");
+        assert_eq!(entry.package, "malicious-pkg");
+        assert_eq!(entry.version, "1.0.0");
+        assert_eq!(entry.source, "osv");
+    }
+
+    // Test 3: TokenInfo from Token conversion
+    #[test]
+    fn test_token_info_from_token() {
+        let token = Token::new("test-id", "test-token", "hash123");
+        let info = TokenInfo::from(&token);
+
+        assert_eq!(info.id, "test-id");
+        assert_eq!(info.name, "test-token");
+        assert!(
+            info.token_prefix.starts_with("rf_"),
+            "token_prefix should start with rf_ prefix"
+        );
+        assert!(
+            info.token_prefix.ends_with("***"),
+            "token_prefix should be masked with ***"
+        );
+    }
+
+    // Test 13: DashboardStats serialization
+    #[test]
+    fn test_dashboard_stats_serialization() {
+        let stats = DashboardStats {
+            total_requests: 100,
+            blocked_requests: 5,
+            cache_hit_rate: 0.8,
+            security_sources_count: 2,
+            blocked_packages_count: 50,
+            security_sources: vec![],
+        };
+
+        let json = serde_json::to_string(&stats).unwrap();
+        let deserialized: DashboardStats = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(stats, deserialized);
+    }
+
+    // Test 14: BlockLogsResponse serialization
+    #[test]
+    fn test_block_logs_response_serialization() {
+        let mut log = BlockLog::new("pypi", "malicious", "1.0.0", "osv");
+        log.reason = Some("CVE-2024-1234".to_string());
+        log.client_ip = Some("192.168.1.1".to_string());
+        let entry = BlockLogEntry::from(log);
+        // Verify IP is masked
+        assert_eq!(entry.client_ip(), Some("192.168.x.x"));
+        let response = BlockLogsResponse {
+            logs: vec![entry],
+            total: 1,
+        };
+
+        let json = serde_json::to_string(&response).unwrap();
+        assert!(json.contains("pypi"));
+        assert!(json.contains("malicious"));
+    }
+
+    // Test 15: CacheStatsResponse serialization
+    #[test]
+    fn test_cache_stats_response_serialization() {
+        let response = CacheStatsResponse {
+            plugin: "filesystem".to_string(),
+            hits: 100,
+            misses: 50,
+            total_size_bytes: 1024,
+            entries: 10,
+        };
+
+        let json = serde_json::to_string(&response).unwrap();
+        let deserialized: CacheStatsResponse = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(response, deserialized);
+    }
+
+    // Test: mask_ip with IPv4 addresses
+    #[test]
+    fn test_mask_ip_ipv4() {
+        assert_eq!(mask_ip("192.168.1.100"), "192.168.x.x");
+        assert_eq!(mask_ip("10.0.0.1"), "10.0.x.x");
+        assert_eq!(mask_ip("172.16.254.3"), "172.16.x.x");
+    }
+
+    // Test: mask_ip with IPv6 addresses
+    #[test]
+    fn test_mask_ip_ipv6() {
+        let masked = mask_ip("2001:0db8:85a3:08d3:1319:8a2e:0370:7348");
+        assert!(masked.starts_with("2001:db8:85a3:8d3:"));
+        assert!(masked.ends_with(":x:x:x:x"));
+    }
+
+    // Test: mask_ip with invalid input
+    #[test]
+    fn test_mask_ip_invalid() {
+        assert_eq!(mask_ip("invalid"), "x.x.x.x");
+    }
+
+    // Test: mask_ip with IPv6 compressed form
+    #[test]
+    fn test_mask_ip_ipv6_compressed() {
+        let masked = mask_ip("::1");
+        // ::1 expands to 0:0:0:0:0:0:0:1, first half preserved, last half masked
+        assert!(masked.starts_with("0:0:0:0:"));
+        assert!(masked.ends_with(":x:x:x:x"));
+    }
+
+    // Test: mask_ip with IPv4-mapped IPv6 form
+    #[test]
+    fn test_mask_ip_ipv4_mapped_ipv6() {
+        let masked = mask_ip("::ffff:192.0.2.128");
+        // IPv4-mapped IPv6 should not leak raw IPv4 dotted notation
+        assert!(!masked.contains("192.0.2.128"));
+        assert!(masked.ends_with(":x:x:x:x"));
+    }
+
+    // Test: CreateTokenResponse Debug redacts token
+    #[test]
+    fn test_create_token_response_debug_redacts_token() {
+        let response = CreateTokenResponse {
+            id: "test-id".to_string(),
+            name: "test-name".to_string(),
+            token: "secret-token-value".to_string(),
+            created_at: Utc::now(),
+            expires_at: None,
+        };
+
+        let debug_output = format!("{:?}", response);
+
+        assert!(!debug_output.contains("secret-token-value"));
+        assert!(debug_output.contains("<redacted>"));
+        assert!(debug_output.contains("test-id"));
+        assert!(debug_output.contains("test-name"));
+    }
+
+    // Test: BlockLogsQuery normalized_limit boundary conditions
+    #[test]
+    fn test_normalized_limit_bounds() {
+        // Zero clamped to 1
+        let q = BlockLogsQuery {
+            limit: Some(0),
+            offset: None,
+        };
+        assert_eq!(q.normalized_limit(), 1);
+
+        // Over MAX clamped down
+        let q = BlockLogsQuery {
+            limit: Some(MAX_PAGE_LIMIT + 1),
+            offset: None,
+        };
+        assert_eq!(q.normalized_limit(), MAX_PAGE_LIMIT);
+
+        // Default when None
+        let q = BlockLogsQuery {
+            limit: None,
+            offset: None,
+        };
+        assert_eq!(q.normalized_limit(), DEFAULT_PAGE_LIMIT);
+    }
+}

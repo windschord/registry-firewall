@@ -17,16 +17,23 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
+use crate::api::{
+    self, BlockLogsQuery, CreateTokenApiRequest, MAX_PATTERN_LENGTH, MAX_REASON_LENGTH,
+    MAX_TOKEN_NAME_LENGTH,
+};
+#[cfg(feature = "swagger-gen")]
+use crate::api::{
+    BlockLogsResponse, CacheClearResponse, CacheStatsResponse, DashboardStats,
+    SecuritySourcesResponse,
+};
 use crate::auth::AuthManager;
 use crate::database::Database;
+#[cfg(feature = "swagger-gen")]
+use crate::models::CustomRule;
 use crate::plugins::cache::traits::CachePlugin;
 use crate::plugins::registry::RegistryPlugin;
 use crate::plugins::security::traits::SecuritySourcePlugin;
 use crate::server::middleware::auth_middleware;
-use crate::webui::api::{
-    self, BlockLogsQuery, DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT, MAX_PATTERN_LENGTH,
-    MAX_REASON_LENGTH, MAX_TOKEN_NAME_LENGTH,
-};
 
 /// Shared application state
 pub struct AppState<D: Database> {
@@ -86,7 +93,7 @@ pub struct MetricsResponse {
 pub fn build_router<D: Database + 'static>(state: AppState<D>) -> Router {
     let auth_manager = Arc::clone(&state.auth_manager);
 
-    Router::new()
+    let router = Router::new()
         // Health and metrics endpoints (no auth required)
         .route("/health", get(health_handler))
         .route("/metrics", get(metrics_handler))
@@ -116,10 +123,15 @@ pub fn build_router<D: Database + 'static>(state: AppState<D>) -> Router {
         .route("/api/rules/:id", delete(api_delete_rule_handler::<D>))
         .route("/api/tokens", get(api_list_tokens_handler::<D>))
         .route("/api/tokens", post(api_create_token_handler::<D>))
-        .route("/api/tokens/:id", delete(api_delete_token_handler::<D>))
-        // Web UI routes
+        .route("/api/tokens/:id", delete(api_delete_token_handler::<D>));
+
+    // Web UI routes (only when webui feature is enabled)
+    #[cfg(feature = "webui")]
+    let router = router
         .route("/ui", get(webui_index_handler))
-        .route("/ui/*path", get(webui_static_handler))
+        .route("/ui/*path", get(webui_static_handler));
+
+    router
         // Apply authentication middleware
         .layer(middleware::from_fn_with_state(
             auth_manager,
@@ -288,16 +300,34 @@ async fn registry_proxy_handler<D: Database + 'static>(
 // =============================================================================
 
 /// Dashboard API handler
-async fn api_dashboard_handler<D: Database + 'static>(
+#[cfg_attr(feature = "swagger-gen", utoipa::path(
+    get,
+    path = "/api/dashboard",
+    responses(
+        (status = 200, description = "Dashboard statistics", body = DashboardStats),
+    ),
+    security(("bearer_token" = []), ("basic_auth" = [])),
+    tag = "dashboard"
+))]
+pub(crate) async fn api_dashboard_handler<D: Database + 'static>(
     State(state): State<AppState<D>>,
 ) -> impl IntoResponse {
-    let stats = api::build_dashboard_stats(
+    match api::build_dashboard_stats(
         state.database.as_ref(),
         &state.security_plugins,
         &state.cache_plugin,
     )
-    .await;
-    Json(stats)
+    .await
+    {
+        Ok(stats) => (StatusCode::OK, Json(serde_json::to_value(stats).unwrap())),
+        Err(e) => {
+            tracing::error!(error = %e, "Failed to build dashboard stats");
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": "Failed to fetch dashboard statistics" })),
+            )
+        }
+    }
 }
 
 /// Block logs API handler
@@ -305,16 +335,25 @@ async fn api_dashboard_handler<D: Database + 'static>(
 /// Query parameters:
 /// - `limit`: Number of logs to return (default: 50, max: 1000)
 /// - `offset`: Pagination offset (default: 0)
-async fn api_blocks_handler<D: Database + 'static>(
+#[cfg_attr(feature = "swagger-gen", utoipa::path(
+    get,
+    path = "/api/blocks",
+    params(
+        ("limit" = Option<u32>, Query, description = "Number of logs to return"),
+        ("offset" = Option<u32>, Query, description = "Pagination offset"),
+    ),
+    responses(
+        (status = 200, description = "Block logs", body = BlockLogsResponse),
+    ),
+    security(("bearer_token" = []), ("basic_auth" = [])),
+    tag = "blocks"
+))]
+pub(crate) async fn api_blocks_handler<D: Database + 'static>(
     State(state): State<AppState<D>>,
     Query(query): Query<BlockLogsQuery>,
 ) -> impl IntoResponse {
-    // Validate and apply limits using constants
-    let limit = query
-        .limit
-        .unwrap_or(DEFAULT_PAGE_LIMIT)
-        .min(MAX_PAGE_LIMIT);
-    let offset = query.offset.unwrap_or(0);
+    let limit = query.normalized_limit();
+    let offset = query.normalized_offset();
 
     match api::get_block_logs(state.database.as_ref(), limit, offset).await {
         Ok(response) => (StatusCode::OK, Json(response)),
@@ -333,7 +372,16 @@ async fn api_blocks_handler<D: Database + 'static>(
 }
 
 /// Security sources status API handler
-async fn api_security_sources_handler<D: Database + 'static>(
+#[cfg_attr(feature = "swagger-gen", utoipa::path(
+    get,
+    path = "/api/security-sources",
+    responses(
+        (status = 200, description = "Security sources list", body = SecuritySourcesResponse),
+    ),
+    security(("bearer_token" = []), ("basic_auth" = [])),
+    tag = "security-sources"
+))]
+pub(crate) async fn api_security_sources_handler<D: Database + 'static>(
     State(state): State<AppState<D>>,
 ) -> impl IntoResponse {
     let response = api::build_security_sources_response(&state.security_plugins);
@@ -341,18 +389,41 @@ async fn api_security_sources_handler<D: Database + 'static>(
 }
 
 /// Trigger sync for a security source
-async fn api_trigger_sync_handler<D: Database + 'static>(
+#[cfg_attr(feature = "swagger-gen", utoipa::path(
+    post,
+    path = "/api/security-sources/{name}/sync",
+    params(
+        ("name" = String, Path, description = "Security source name"),
+    ),
+    responses(
+        (status = 200, description = "Sync triggered"),
+    ),
+    security(("bearer_token" = []), ("basic_auth" = [])),
+    tag = "security-sources"
+))]
+pub(crate) async fn api_trigger_sync_handler<D: Database + 'static>(
     State(_state): State<AppState<D>>,
     Path(name): Path<String>,
 ) -> impl IntoResponse {
-    // TODO: Implement manual sync trigger
-    Json(serde_json::json!({
-        "message": format!("Sync triggered for {}", name)
-    }))
+    (
+        StatusCode::NOT_IMPLEMENTED,
+        Json(serde_json::json!({
+            "error": format!("Manual sync trigger for '{}' is not yet implemented", name)
+        })),
+    )
 }
 
 /// Cache stats API handler
-async fn api_cache_stats_handler<D: Database + 'static>(
+#[cfg_attr(feature = "swagger-gen", utoipa::path(
+    get,
+    path = "/api/cache/stats",
+    responses(
+        (status = 200, description = "Cache statistics", body = CacheStatsResponse),
+    ),
+    security(("bearer_token" = []), ("basic_auth" = [])),
+    tag = "cache"
+))]
+pub(crate) async fn api_cache_stats_handler<D: Database + 'static>(
     State(state): State<AppState<D>>,
 ) -> impl IntoResponse {
     let stats = api::get_cache_stats(&state.cache_plugin).await;
@@ -360,7 +431,16 @@ async fn api_cache_stats_handler<D: Database + 'static>(
 }
 
 /// Cache clear API handler
-async fn api_cache_clear_handler<D: Database + 'static>(
+#[cfg_attr(feature = "swagger-gen", utoipa::path(
+    delete,
+    path = "/api/cache",
+    responses(
+        (status = 200, description = "Cache cleared", body = CacheClearResponse),
+    ),
+    security(("bearer_token" = []), ("basic_auth" = [])),
+    tag = "cache"
+))]
+pub(crate) async fn api_cache_clear_handler<D: Database + 'static>(
     State(state): State<AppState<D>>,
 ) -> impl IntoResponse {
     match api::clear_cache(&state.cache_plugin).await {
@@ -383,7 +463,16 @@ async fn api_cache_clear_handler<D: Database + 'static>(
 }
 
 /// List custom rules handler
-async fn api_list_rules_handler<D: Database + 'static>(
+#[cfg_attr(feature = "swagger-gen", utoipa::path(
+    get,
+    path = "/api/rules",
+    responses(
+        (status = 200, description = "Custom rules list"),
+    ),
+    security(("bearer_token" = []), ("basic_auth" = [])),
+    tag = "rules"
+))]
+pub(crate) async fn api_list_rules_handler<D: Database + 'static>(
     State(state): State<AppState<D>>,
 ) -> impl IntoResponse {
     match state.database.list_rules().await {
@@ -398,46 +487,61 @@ async fn api_list_rules_handler<D: Database + 'static>(
     }
 }
 
+/// Validate custom rule fields
+fn validate_custom_rule(
+    rule: &crate::models::CustomRule,
+) -> Result<(), (StatusCode, Json<serde_json::Value>)> {
+    if rule.package_pattern.is_empty() {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({ "error": "Package pattern cannot be empty" })),
+        ));
+    }
+    if rule.package_pattern.len() > MAX_PATTERN_LENGTH {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({ "error": "Package pattern exceeds maximum length" })),
+        ));
+    }
+    if rule.version_constraint.len() > MAX_PATTERN_LENGTH {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({ "error": "Version constraint exceeds maximum length" })),
+        ));
+    }
+    if let Some(ref reason) = rule.reason {
+        if reason.len() > MAX_REASON_LENGTH {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::json!({ "error": "Reason exceeds maximum length" })),
+            ));
+        }
+    }
+    Ok(())
+}
+
 /// Create custom rule handler
 ///
 /// Validates rule fields before insertion:
 /// - package_pattern: required, max 512 characters
 /// - version_constraint: optional, max 512 characters
 /// - reason: optional, max 1024 characters
-async fn api_create_rule_handler<D: Database + 'static>(
+#[cfg_attr(feature = "swagger-gen", utoipa::path(
+    post,
+    path = "/api/rules",
+    request_body = CustomRule,
+    responses(
+        (status = 201, description = "Rule created"),
+    ),
+    security(("bearer_token" = []), ("basic_auth" = [])),
+    tag = "rules"
+))]
+pub(crate) async fn api_create_rule_handler<D: Database + 'static>(
     State(state): State<AppState<D>>,
     Json(rule): Json<crate::models::CustomRule>,
 ) -> impl IntoResponse {
-    // Validate package_pattern
-    if rule.package_pattern.is_empty() {
-        return (
-            StatusCode::BAD_REQUEST,
-            Json(serde_json::json!({ "error": "Package pattern cannot be empty" })),
-        );
-    }
-    if rule.package_pattern.len() > MAX_PATTERN_LENGTH {
-        return (
-            StatusCode::BAD_REQUEST,
-            Json(serde_json::json!({ "error": "Package pattern exceeds maximum length" })),
-        );
-    }
-
-    // Validate version_constraint
-    if rule.version_constraint.len() > MAX_PATTERN_LENGTH {
-        return (
-            StatusCode::BAD_REQUEST,
-            Json(serde_json::json!({ "error": "Version constraint exceeds maximum length" })),
-        );
-    }
-
-    // Validate reason if provided
-    if let Some(ref reason) = rule.reason {
-        if reason.len() > MAX_REASON_LENGTH {
-            return (
-                StatusCode::BAD_REQUEST,
-                Json(serde_json::json!({ "error": "Reason exceeds maximum length" })),
-            );
-        }
+    if let Err(response) = validate_custom_rule(&rule) {
+        return response;
     }
 
     tracing::info!(
@@ -462,7 +566,20 @@ async fn api_create_rule_handler<D: Database + 'static>(
 }
 
 /// Get custom rule by ID handler
-async fn api_get_rule_handler<D: Database + 'static>(
+#[cfg_attr(feature = "swagger-gen", utoipa::path(
+    get,
+    path = "/api/rules/{id}",
+    params(
+        ("id" = i64, Path, description = "Rule ID"),
+    ),
+    responses(
+        (status = 200, description = "Custom rule"),
+        (status = 404, description = "Rule not found"),
+    ),
+    security(("bearer_token" = []), ("basic_auth" = [])),
+    tag = "rules"
+))]
+pub(crate) async fn api_get_rule_handler<D: Database + 'static>(
     State(state): State<AppState<D>>,
     Path(id): Path<i64>,
 ) -> impl IntoResponse {
@@ -488,41 +605,26 @@ async fn api_get_rule_handler<D: Database + 'static>(
 /// - package_pattern: required, max 512 characters
 /// - version_constraint: optional, max 512 characters
 /// - reason: optional, max 1024 characters
-async fn api_update_rule_handler<D: Database + 'static>(
+#[cfg_attr(feature = "swagger-gen", utoipa::path(
+    put,
+    path = "/api/rules/{id}",
+    params(
+        ("id" = i64, Path, description = "Rule ID"),
+    ),
+    request_body = CustomRule,
+    responses(
+        (status = 200, description = "Rule updated"),
+    ),
+    security(("bearer_token" = []), ("basic_auth" = [])),
+    tag = "rules"
+))]
+pub(crate) async fn api_update_rule_handler<D: Database + 'static>(
     State(state): State<AppState<D>>,
     Path(id): Path<i64>,
     Json(mut rule): Json<crate::models::CustomRule>,
 ) -> impl IntoResponse {
-    // Validate package_pattern
-    if rule.package_pattern.is_empty() {
-        return (
-            StatusCode::BAD_REQUEST,
-            Json(serde_json::json!({ "error": "Package pattern cannot be empty" })),
-        );
-    }
-    if rule.package_pattern.len() > MAX_PATTERN_LENGTH {
-        return (
-            StatusCode::BAD_REQUEST,
-            Json(serde_json::json!({ "error": "Package pattern exceeds maximum length" })),
-        );
-    }
-
-    // Validate version_constraint
-    if rule.version_constraint.len() > MAX_PATTERN_LENGTH {
-        return (
-            StatusCode::BAD_REQUEST,
-            Json(serde_json::json!({ "error": "Version constraint exceeds maximum length" })),
-        );
-    }
-
-    // Validate reason if provided
-    if let Some(ref reason) = rule.reason {
-        if reason.len() > MAX_REASON_LENGTH {
-            return (
-                StatusCode::BAD_REQUEST,
-                Json(serde_json::json!({ "error": "Reason exceeds maximum length" })),
-            );
-        }
+    if let Err(response) = validate_custom_rule(&rule) {
+        return response;
     }
 
     tracing::info!(
@@ -551,7 +653,19 @@ async fn api_update_rule_handler<D: Database + 'static>(
 /// Delete custom rule handler
 ///
 /// Returns 204 No Content on success (REST best practice for DELETE).
-async fn api_delete_rule_handler<D: Database + 'static>(
+#[cfg_attr(feature = "swagger-gen", utoipa::path(
+    delete,
+    path = "/api/rules/{id}",
+    params(
+        ("id" = i64, Path, description = "Rule ID"),
+    ),
+    responses(
+        (status = 204, description = "Rule deleted"),
+    ),
+    security(("bearer_token" = []), ("basic_auth" = [])),
+    tag = "rules"
+))]
+pub(crate) async fn api_delete_rule_handler<D: Database + 'static>(
     State(state): State<AppState<D>>,
     Path(id): Path<i64>,
 ) -> impl IntoResponse {
@@ -574,7 +688,16 @@ async fn api_delete_rule_handler<D: Database + 'static>(
 ///
 /// Returns token metadata with masked token prefix for identification.
 /// Full token values are never exposed after creation.
-async fn api_list_tokens_handler<D: Database + 'static>(
+#[cfg_attr(feature = "swagger-gen", utoipa::path(
+    get,
+    path = "/api/tokens",
+    responses(
+        (status = 200, description = "Token list"),
+    ),
+    security(("bearer_token" = []), ("basic_auth" = [])),
+    tag = "tokens"
+))]
+pub(crate) async fn api_list_tokens_handler<D: Database + 'static>(
     State(state): State<AppState<D>>,
 ) -> impl IntoResponse {
     match state.auth_manager.list_tokens().await {
@@ -597,16 +720,18 @@ async fn api_list_tokens_handler<D: Database + 'static>(
     }
 }
 
-/// Create token request
-#[derive(Debug, Deserialize)]
-pub struct CreateTokenApiRequest {
-    pub name: String,
-    pub allowed_ecosystems: Option<Vec<String>>,
-    pub expires_at: Option<chrono::DateTime<chrono::Utc>>,
-}
-
 /// Create token handler
-async fn api_create_token_handler<D: Database + 'static>(
+#[cfg_attr(feature = "swagger-gen", utoipa::path(
+    post,
+    path = "/api/tokens",
+    request_body = CreateTokenApiRequest,
+    responses(
+        (status = 201, description = "Token created"),
+    ),
+    security(("bearer_token" = []), ("basic_auth" = [])),
+    tag = "tokens"
+))]
+pub(crate) async fn api_create_token_handler<D: Database + 'static>(
     State(state): State<AppState<D>>,
     Json(req): Json<CreateTokenApiRequest>,
 ) -> impl IntoResponse {
@@ -659,7 +784,19 @@ async fn api_create_token_handler<D: Database + 'static>(
 ///
 /// Returns 204 No Content on success (REST best practice for DELETE).
 /// Token ID is logged for audit purposes (never the token value).
-async fn api_delete_token_handler<D: Database + 'static>(
+#[cfg_attr(feature = "swagger-gen", utoipa::path(
+    delete,
+    path = "/api/tokens/{id}",
+    params(
+        ("id" = String, Path, description = "Token ID"),
+    ),
+    responses(
+        (status = 204, description = "Token revoked"),
+    ),
+    security(("bearer_token" = []), ("basic_auth" = [])),
+    tag = "tokens"
+))]
+pub(crate) async fn api_delete_token_handler<D: Database + 'static>(
     State(state): State<AppState<D>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
@@ -684,11 +821,13 @@ async fn api_delete_token_handler<D: Database + 'static>(
 // =============================================================================
 
 /// Web UI index handler
+#[cfg(feature = "webui")]
 async fn webui_index_handler() -> impl IntoResponse {
     crate::webui::serve_index()
 }
 
 /// Web UI static file handler
+#[cfg(feature = "webui")]
 async fn webui_static_handler(Path(path): Path<String>) -> impl IntoResponse {
     crate::webui::serve_static(&path)
 }
@@ -889,6 +1028,7 @@ mod tests {
     }
 
     // Test 13: Web UI index endpoint
+    #[cfg(feature = "webui")]
     #[tokio::test]
     async fn test_webui_index_endpoint() {
         let state = create_test_state();
@@ -900,6 +1040,7 @@ mod tests {
     }
 
     // Test 14: Web UI static files endpoint
+    #[cfg(feature = "webui")]
     #[tokio::test]
     async fn test_webui_static_endpoint() {
         let state = create_test_state();

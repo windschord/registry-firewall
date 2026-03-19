@@ -27,12 +27,30 @@ struct Args {
     /// Path to the configuration file
     #[arg(short, long, env = "REGISTRY_FIREWALL_CONFIG")]
     config: Option<String>,
+
+    /// Generate OpenAPI specification (swagger.json) and exit
+    #[cfg(feature = "swagger-gen")]
+    #[arg(long)]
+    generate_swagger: bool,
 }
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     // Parse CLI arguments
     let args = Args::parse();
+
+    // Generate swagger.json if requested
+    #[cfg(feature = "swagger-gen")]
+    if args.generate_swagger {
+        use registry_firewall::api::openapi::ApiDoc;
+        use utoipa::OpenApi;
+        let spec = ApiDoc::openapi()
+            .to_pretty_json()
+            .map_err(|e| anyhow::anyhow!("Failed to serialize OpenAPI spec: {}", e))?;
+        std::fs::write("swagger.json", &spec)?;
+        eprintln!("swagger.json generated successfully ({} bytes)", spec.len());
+        return Ok(());
+    }
 
     // Load configuration
     let config = load_config(&args)?;

@@ -53,9 +53,9 @@ anyhow = "1"
 config = "0.14"
 url = "2"
 
-# Embed static files
-rust-embed = "8"
-mime_guess = "2"
+# Embed static files (optional, enabled by "webui" feature)
+rust-embed = { version = "8", optional = true }
+mime_guess = { version = "2", optional = true }
 
 # Git operations (for OpenSSF sync)
 git2 = "0.20"
@@ -73,6 +73,14 @@ clap = { version = "4", features = ["derive", "env"] }
 # Regex (lightweight)
 regex-lite = "0.1"
 glob = "0.3.3"
+
+# OpenAPI specification generation (optional, enabled by "swagger-gen" feature)
+utoipa = { version = "5", features = ["axum_extras", "chrono"], optional = true }
+utoipa-axum = { version = "0.2", optional = true }
+[features]
+default = ["webui"]
+webui = ["dep:rust-embed", "dep:mime_guess"]
+swagger-gen = ["dep:utoipa", "dep:utoipa-axum"]
 
 [dev-dependencies]
 mockall = "0.12"

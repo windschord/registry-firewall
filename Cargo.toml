@@ -38,7 +38,7 @@ tracing-subscriber = { version = "0.3", features = ["json", "env-filter"] }
 
 # Security
 argon2 = "0.5"
-rand = "0.8"
+rand = "0.9"
 base64 = "0.22"
 
 # Version parsing
